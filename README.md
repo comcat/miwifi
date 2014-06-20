@@ -8,9 +8,10 @@ Support R1D router (with 1T sata disk). Mini will be supported in the furture.
 Feature
 ---
 
-+ 2.6.36 kernel
-+ SPI Flash
-+ SATA Support
++ Kernel 2.6.36 
++ SPI Flash     (MXIC 25L12835F)
++ SATA Support  (ASM1062)
++ Ethernet      (BCM47xx 1G)
 
 
 Build
