@@ -27,7 +27,4 @@ obj-$(CONFIG_PLAT_BCM5301X) += $(addprefix $(SHARED)/, spiflash.o)
 #obj-$(CONFIG_PLAT_BCM5301X) += $(addprefix $(SHARED)/, nandcore.o)
 #obj-$(CONFIG_PLAT_BCM5301X) += $(addprefix $(SHARED)/, hndnand.o)
 obj-$(CONFIG_PLAT_BCM5301X) += $(addprefix $(SHARED)/, linux_gpio.o)
-obj-$(CONFIG_PLAT_BCM5301X) += $(addprefix $(SHARED)/, siutils.o)
-obj-$(CONFIG_PLAT_BCM5301X) += $(addprefix $(SHARED)/, aiutils.o)
-obj-$(CONFIG_PLAT_BCM5301X) += $(addprefix $(SHARED)/, bcmutils.o)
 obj-$(CONFIG_CACHE_L310) += cache-l310.o

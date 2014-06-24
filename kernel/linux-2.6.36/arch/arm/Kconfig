@@ -857,128 +857,128 @@ endchoice
 # Kconfigs may be included either alphabetically (according to the
 # plat- suffix) or along side the corresponding mach-* source.
 #
-source "arch/arm/mach-aaec2000/Kconfig"
+#source "arch/arm/mach-aaec2000/Kconfig"
 
-source "arch/arm/mach-at91/Kconfig"
+#source "arch/arm/mach-at91/Kconfig"
 
-source "arch/arm/mach-bcmring/Kconfig"
+#source "arch/arm/mach-bcmring/Kconfig"
 
-source "arch/arm/mach-clps711x/Kconfig"
+#source "arch/arm/mach-clps711x/Kconfig"
 
-source "arch/arm/mach-cns3xxx/Kconfig"
+#source "arch/arm/mach-cns3xxx/Kconfig"
 
-source "arch/arm/mach-davinci/Kconfig"
+#source "arch/arm/mach-davinci/Kconfig"
 
-source "arch/arm/mach-dove/Kconfig"
+#source "arch/arm/mach-dove/Kconfig"
 
-source "arch/arm/mach-ep93xx/Kconfig"
+#source "arch/arm/mach-ep93xx/Kconfig"
 
-source "arch/arm/mach-footbridge/Kconfig"
+#source "arch/arm/mach-footbridge/Kconfig"
 
-source "arch/arm/mach-gemini/Kconfig"
+#source "arch/arm/mach-gemini/Kconfig"
 
-source "arch/arm/mach-h720x/Kconfig"
+#source "arch/arm/mach-h720x/Kconfig"
 
-source "arch/arm/mach-integrator/Kconfig"
+#source "arch/arm/mach-integrator/Kconfig"
 
-source "arch/arm/mach-iop32x/Kconfig"
+#source "arch/arm/mach-iop32x/Kconfig"
 
-source "arch/arm/mach-iop33x/Kconfig"
+#source "arch/arm/mach-iop33x/Kconfig"
 
-source "arch/arm/mach-iop13xx/Kconfig"
+#source "arch/arm/mach-iop13xx/Kconfig"
 
-source "arch/arm/mach-ixp4xx/Kconfig"
+#source "arch/arm/mach-ixp4xx/Kconfig"
 
-source "arch/arm/mach-ixp2000/Kconfig"
+#source "arch/arm/mach-ixp2000/Kconfig"
 
-source "arch/arm/mach-ixp23xx/Kconfig"
+#source "arch/arm/mach-ixp23xx/Kconfig"
 
-source "arch/arm/mach-kirkwood/Kconfig"
+#source "arch/arm/mach-kirkwood/Kconfig"
 
-source "arch/arm/mach-ks8695/Kconfig"
+#source "arch/arm/mach-ks8695/Kconfig"
 
-source "arch/arm/mach-lh7a40x/Kconfig"
+#source "arch/arm/mach-lh7a40x/Kconfig"
 
-source "arch/arm/mach-loki/Kconfig"
+#source "arch/arm/mach-loki/Kconfig"
 
-source "arch/arm/mach-lpc32xx/Kconfig"
+#source "arch/arm/mach-lpc32xx/Kconfig"
 
-source "arch/arm/mach-msm/Kconfig"
+#source "arch/arm/mach-msm/Kconfig"
 
-source "arch/arm/mach-mv78xx0/Kconfig"
+#source "arch/arm/mach-mv78xx0/Kconfig"
 
-source "arch/arm/plat-mxc/Kconfig"
+#source "arch/arm/plat-mxc/Kconfig"
 
-source "arch/arm/mach-netx/Kconfig"
+#source "arch/arm/mach-netx/Kconfig"
 
-source "arch/arm/mach-nomadik/Kconfig"
-source "arch/arm/plat-nomadik/Kconfig"
+#source "arch/arm/mach-nomadik/Kconfig"
+#source "arch/arm/plat-nomadik/Kconfig"
 
-source "arch/arm/mach-ns9xxx/Kconfig"
+#source "arch/arm/mach-ns9xxx/Kconfig"
 
-source "arch/arm/mach-nuc93x/Kconfig"
+#source "arch/arm/mach-nuc93x/Kconfig"
 
-source "arch/arm/plat-omap/Kconfig"
+#source "arch/arm/plat-omap/Kconfig"
 
-source "arch/arm/mach-omap1/Kconfig"
+#source "arch/arm/mach-omap1/Kconfig"
 
-source "arch/arm/mach-omap2/Kconfig"
+#source "arch/arm/mach-omap2/Kconfig"
 
-source "arch/arm/mach-orion5x/Kconfig"
+#source "arch/arm/mach-orion5x/Kconfig"
 
-source "arch/arm/mach-pxa/Kconfig"
-source "arch/arm/plat-pxa/Kconfig"
+#source "arch/arm/mach-pxa/Kconfig"
+#source "arch/arm/plat-pxa/Kconfig"
 
-source "arch/arm/mach-mmp/Kconfig"
+#source "arch/arm/mach-mmp/Kconfig"
 
-source "arch/arm/mach-realview/Kconfig"
+#source "arch/arm/mach-realview/Kconfig"
 
-source "arch/arm/mach-sa1100/Kconfig"
+#source "arch/arm/mach-sa1100/Kconfig"
 
-source "arch/arm/plat-samsung/Kconfig"
-source "arch/arm/plat-s3c24xx/Kconfig"
-source "arch/arm/plat-s5p/Kconfig"
+#source "arch/arm/plat-samsung/Kconfig"
+#source "arch/arm/plat-s3c24xx/Kconfig"
+#source "arch/arm/plat-s5p/Kconfig"
 
-source "arch/arm/plat-spear/Kconfig"
+#source "arch/arm/plat-spear/Kconfig"
 
 if ARCH_S3C2410
-source "arch/arm/mach-s3c2400/Kconfig"
-source "arch/arm/mach-s3c2410/Kconfig"
-source "arch/arm/mach-s3c2412/Kconfig"
-source "arch/arm/mach-s3c2416/Kconfig"
-source "arch/arm/mach-s3c2440/Kconfig"
-source "arch/arm/mach-s3c2443/Kconfig"
+#source "arch/arm/mach-s3c2400/Kconfig"
+#source "arch/arm/mach-s3c2410/Kconfig"
+#source "arch/arm/mach-s3c2412/Kconfig"
+#source "arch/arm/mach-s3c2416/Kconfig"
+#source "arch/arm/mach-s3c2440/Kconfig"
+#source "arch/arm/mach-s3c2443/Kconfig"
 endif
 
 if ARCH_S3C64XX
-source "arch/arm/mach-s3c64xx/Kconfig"
+#source "arch/arm/mach-s3c64xx/Kconfig"
 endif
 
-source "arch/arm/mach-s5p6440/Kconfig"
+#source "arch/arm/mach-s5p6440/Kconfig"
 
-source "arch/arm/mach-s5p6442/Kconfig"
+#source "arch/arm/mach-s5p6442/Kconfig"
 
-source "arch/arm/mach-s5pc100/Kconfig"
+#source "arch/arm/mach-s5pc100/Kconfig"
 
-source "arch/arm/mach-s5pv210/Kconfig"
+#source "arch/arm/mach-s5pv210/Kconfig"
 
-source "arch/arm/mach-s5pv310/Kconfig"
+#source "arch/arm/mach-s5pv310/Kconfig"
 
-source "arch/arm/mach-shmobile/Kconfig"
+#source "arch/arm/mach-shmobile/Kconfig"
 
-source "arch/arm/plat-stmp3xxx/Kconfig"
+#source "arch/arm/plat-stmp3xxx/Kconfig"
 
-source "arch/arm/mach-tegra/Kconfig"
+#source "arch/arm/mach-tegra/Kconfig"
 
-source "arch/arm/mach-u300/Kconfig"
+#source "arch/arm/mach-u300/Kconfig"
 
-source "arch/arm/mach-ux500/Kconfig"
+#source "arch/arm/mach-ux500/Kconfig"
 
-source "arch/arm/mach-versatile/Kconfig"
+#source "arch/arm/mach-versatile/Kconfig"
 
-source "arch/arm/mach-vexpress/Kconfig"
+#source "arch/arm/mach-vexpress/Kconfig"
 
-source "arch/arm/mach-w90x900/Kconfig"
+#source "arch/arm/mach-w90x900/Kconfig"
 
 source "arch/arm/mach-brcm-hnd/Kconfig"
 source "arch/arm/plat-brcm/Kconfig"
