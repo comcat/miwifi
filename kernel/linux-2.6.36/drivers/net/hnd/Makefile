@@ -35,7 +35,7 @@ include $(WLCFGDIR)/wl.mk
 endif
 
 hnd-objs := $(addprefix $(SHARED)/, $(sort $(WLFILES:.c=.o)))
-HND_OBJS := $(addprefix $(src)/$(SHARED)/, $(sort $(WLFILES:.c=.o)))
+#HND_OBJS := $(addprefix $(src)/$(SHARED)/, $(sort $(WLFILES:.c=.o)))
 
 EXTRA_CFLAGS += $(WLFLAGS) -DBCM5354 -DLINUX_HYBRID_POSTPROCESSING_REMOVAL
 
@@ -45,16 +45,16 @@ EXTRA_CFLAGS    += -DROBO_SRAB -DBCMDMASGLISTOSL
 endif
 
 ifneq ($(CONFIG_BCM947XX),y)
-HND_OBJS += $(SHARED)/nvramstubs.o
+#HND_OBJS += $(SHARED)/nvramstubs.o
 hnd-objs += $(SHARED)/nvramstubs.o
 endif
 
 ifeq ($(CONFIG_ET_47XX),y)
-HND_OBJS += $(SHARED)/bcmrobo.o
+#HND_OBJS += $(SHARED)/bcmrobo.o
 hnd-objs += $(SHARED)/bcmrobo.o
 else
 ifeq ($(CONFIG_BCM57XX),y)
-HND_OBJS += $(SHARED)/bcmrobo.o
+#HND_OBJS += $(SHARED)/bcmrobo.o
 hnd-objs += $(SHARED)/bcmrobo.o
 endif
 endif
@@ -66,6 +66,8 @@ endif
 ifeq ($(BCMDBG_MEM),1)
 EXTRA_CFLAGS += -DBCMDBG_MEM
 endif
+
+HND_OBJS = $(wildcard $(src)/$(SHARED)/*.o)
 
 $(src)/shared_ksyms.c:
 	sh -e $(src)/shared_ksyms.sh $(HND_OBJS) > $@
