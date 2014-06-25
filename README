@@ -1,6 +1,5 @@
 
-
-    Xiaomi Router kernel
+        Xiaomi Router kernel
 
 
 1. Overview
@@ -9,7 +8,6 @@
 Support R1D router (with 1T sata disk). Mini will be supported in the furture.
 
 The Kernel version is 2.6.36
-
 WLAN driver are binary object file from Broadcom located in 'drivers/net/wl'
 
 
@@ -133,7 +131,8 @@ $ sudo /etc/init.d/xinetd restart
 4.2.3 CFE tftp load
 --------------------
 
-You can set the nvram parameter 'flag_tftp_bootup' to 'on' to enable the CFE tftpboot:
+You can set the nvram parameter 'flag_tftp_bootup' to 'on' to enable the CFE
+tftpboot:
 
 root@XiaoQiang:/# nvram get flag_tftp_bootup
 off
