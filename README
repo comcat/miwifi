@@ -30,8 +30,7 @@ WLAN driver are binary object file from Broadcom located in 'drivers/net/wl'
     + 32 KB I-cache and 32 KB D-cache per core
     + 256 KB L2 Cache (shared)
     + 128-entry TLB
-    + SMP and AMP capable
-    + Boot ROM
+    + SMP
 
   o Bus
     + DDR3: Broadcom BCM4709 On-Chip DDR3 interface
@@ -56,7 +55,11 @@ WLAN driver are binary object file from Broadcom located in 'drivers/net/wl'
 3.2 Unsupported Features
 ------------------------
 
-  N.A.
+Will be support in the furture:
+
+  o MISC
+    + TEMP Sensor
+    + GPIO LED
 
 
 4. Usage
@@ -73,6 +76,77 @@ The following is validated in Ubuntu 12.04:
   $ cd miwifi/kernel/linux-2.6.36
   $ make ARCH=arm CROSS_COMPILE=arm-brcm-linux-uclibcgnueabi- vmlinuz -j4
 
-The output image is arch/arm/boot/vmlinuz, you can load it from CFE via tftpboot
+The output image is arch/arm/boot/vmlinuz and the build system automatly install the vmlinuz
+into /tftpboot/ , you can load it from CFE via tftpboot
 
 
+4.2 Enviroment
+---------------
+
+4.2.1 TFTP Server
+------------------
+
+We load the kernel through tftpboot. So we need to install a tftp server in your desktop PC:
+
+  $ sudo apt-get install tftpd tftp
+
+Configure the tftp server via touching a file /etc/xinetd.d/tftp with following contents:
+
+$ cat /etc/xinetd.d/tftp
+service tftp
+{
+    socket_type = dgram
+    protocol = udp
+    wait = yes
+    user = root
+    server = /usr/sbin/in.tftpd
+    server_args = -s /tftpboot
+    disable = no
+    per_source = 11
+    cps = 100 2
+    flags = IPv4
+}
+
+$ ls /etc/xinetd.d/
+chargen  daytime  discard  echo  tftp  time
+
+$ sudo mkdir /tftpboot
+$ sudo chmod 777 /tftpboot
+
+$ sudo /etc/init.d/xinetd restart
+
+
+4.2.1 CFE tftp load
+--------------------
+
+You can set the nvram parameter 'flag_tftp_bootup' to 'on' to enable the CFE tftpboot:
+
+root@XiaoQiang:/# nvram get flag_tftp_bootup
+off
+root@XiaoQiang:/# nvram set flag_tftp_bootup=on
+root@XiaoQiang:/# nvram commit
+root@XiaoQiang:/# nvram get flag_tftp_bootup
+on
+root@XiaoQiang:/# reboot
+ 
+...........
+CFE version v1.0.4
+BSP: 6.37.14.34 (r415984) based on BBP 1.0.37 for BCM947XX (32bit,SP,)
+Build Date: Wed Apr 30 18:03:21 CST 2014 (szy@shenzhiyong-ct)
+ 
+...........
+ 
+Device eth0:  hwaddr 8C-BE-BE-20-B7-48, ipaddr 192.168.1.1, mask 255.255.255.0
+        gateway not set, nameserver not set
+********** flag_tftp_bootup=on **********
+tftp network: ifconfig eth0 -addr=192.168.1.1 -mask=255.255.255.0 -gw=192.168.1.1
+Device eth0:  hwaddr 8C-BE-BE-20-B7-48, ipaddr 192.168.1.1, mask 255.255.255.0
+        gateway 192.168.1.1, nameserver not set
+kernel: boot -raw -z -addr=0x8000 -max=0x800000 192.168.1.2:vmlinuz
+Loader:raw Filesys:tftp Dev:eth0 File:192.168.1.2:vmlinuz Options:(null)
+Loading: ........ 5704544 bytes read
+Entry at 0x00008000
+Closing network.
+Starting program at 0x00008000
+......
+......
