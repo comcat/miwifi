@@ -1,6 +1,10 @@
 
-Xiaomi Router kernel
-===
+
+    Xiaomi Router kernel
+
+
+1. Overview
+============
 
 Support R1D router (with 1T sata disk). Mini will be supported in the furture.
 
@@ -9,8 +13,17 @@ The Kernel version is 2.6.36
 WLAN driver are binary object file from Broadcom located in 'drivers/net/wl'
 
 
-Feature
----
+2. Change History
+==================
+
+  - 2014/06: First version with kernel 2.6.36, support router R1D
+
+
+3. Features
+===========
+
+3.1 Supported Features
+-----------------------
 
   o General Platform
     + ARM Cortex A9 Dual-Core
@@ -40,8 +53,17 @@ Feature
     + SATA Disk: Samsung 1T Sata disk 
 
 
-Build
----
+3.2 Unsupported Features
+------------------------
+
+  N.A.
+
+
+4. Usage
+==========
+
+4.1 Build
+----------
 
 The following is validated in Ubuntu 12.04:
 
@@ -52,3 +74,5 @@ The following is validated in Ubuntu 12.04:
   $ make ARCH=arm CROSS_COMPILE=arm-brcm-linux-uclibcgnueabi- vmlinuz -j4
 
 The output image is arch/arm/boot/vmlinuz, you can load it from CFE via tftpboot
+
+
