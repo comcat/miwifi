@@ -76,21 +76,35 @@ The following is validated in Ubuntu 12.04:
   $ cd miwifi/kernel/linux-2.6.36
   $ make ARCH=arm CROSS_COMPILE=arm-brcm-linux-uclibcgnueabi- vmlinuz -j4
 
-The output image is arch/arm/boot/vmlinuz and the build system automatly install the vmlinuz
-into /tftpboot/ , you can load it from CFE via tftpboot
+The output image is arch/arm/boot/vmlinuz and the build system automatly
+install the vmlinuz into /tftpboot/ , you can load it from CFE via tftpboot
 
 
 4.2 Enviroment
 ---------------
 
-4.2.1 TFTP Server
+4.2.1 Network
+--------------
+
+Make sure the LAN port (black one) of the Router and your PC ethernet port are
+connected to the same Ethernet HUB.
+
+The default ip addr of the CFE is 192.168.1.1. So we need to setup a new ip
+for our PC something like:
+
+  $ sudo ifconfig eth0:1 192.168.1.2
+
+
+4.2.2 TFTP Server
 ------------------
 
-We load the kernel through tftpboot. So we need to install a tftp server in your desktop PC:
+We load the kernel through tftpboot. So we need to install a tftp server in your
+desktop PC:
 
   $ sudo apt-get install tftpd tftp
 
-Configure the tftp server via touching a file /etc/xinetd.d/tftp with following contents:
+Configure the tftp server via touching a file /etc/xinetd.d/tftp with following
+contents:
 
 $ cat /etc/xinetd.d/tftp
 service tftp
@@ -116,7 +130,7 @@ $ sudo chmod 777 /tftpboot
 $ sudo /etc/init.d/xinetd restart
 
 
-4.2.1 CFE tftp load
+4.2.3 CFE tftp load
 --------------------
 
 You can set the nvram parameter 'flag_tftp_bootup' to 'on' to enable the CFE tftpboot:
