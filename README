@@ -49,6 +49,10 @@ WLAN driver are binary object file from Broadcom located in 'drivers/net/wl'
     + NOR Flash: MXIC 25L12835F (16MB)
     + SATA Disk: Samsung 1T Sata disk 
 
+  o MISC
+    + Temp Sensor: TMP75
+    + LED: Three LEDs (red, yellow, blue), GPIO interface
+
 
 3.2 Unsupported Features
 ------------------------
@@ -56,8 +60,7 @@ WLAN driver are binary object file from Broadcom located in 'drivers/net/wl'
 Will be support in the furture:
 
   o MISC
-    + TEMP Sensor
-    + GPIO LED
+    + PWM
 
 
 4. Usage
@@ -87,8 +90,8 @@ install the vmlinuz into /tftpboot/ , you can load it from CFE via tftpboot
 Make sure the LAN port (black one) of the Router and your PC ethernet port are
 connected to the same Ethernet HUB.
 
-The default ip addr of the CFE is 192.168.1.1. So we need to setup a new ip
-for our PC something like:
+The default ip addr of the CFE is 192.168.1.1 and the default tftp server ip is
+192.168.1.2. So we need to setup a new ip for your PC eth0 port something like:
 
   $ sudo ifconfig eth0:1 192.168.1.2
 
@@ -128,11 +131,16 @@ $ sudo chmod 777 /tftpboot
 $ sudo /etc/init.d/xinetd restart
 
 
+Now you can place your vmlinuz into the /tftpboot:
+
+$ cp /path/to/kernel/arch/arm/boot/vmlinuz /tftpboot
+
+
 4.2.3 CFE tftp load
 --------------------
 
-You can set the nvram parameter 'flag_tftp_bootup' to 'on' to enable the CFE
-tftpboot:
+You need to set the nvram parameter 'flag_tftp_bootup' to 'on' to make the
+CFE to load the vmlinuz through tftp from tftp server:
 
 root@XiaoQiang:/# nvram get flag_tftp_bootup
 off

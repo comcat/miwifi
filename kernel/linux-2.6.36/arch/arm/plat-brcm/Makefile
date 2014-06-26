@@ -28,3 +28,4 @@ obj-$(CONFIG_PLAT_BCM5301X) += $(addprefix $(SHARED)/, spiflash.o)
 #obj-$(CONFIG_PLAT_BCM5301X) += $(addprefix $(SHARED)/, hndnand.o)
 obj-$(CONFIG_PLAT_BCM5301X) += $(addprefix $(SHARED)/, linux_gpio.o)
 obj-$(CONFIG_CACHE_L310) += cache-l310.o
+obj-$(CONFIG_XIAOMI_R1D) += plat-xiaomi.o
