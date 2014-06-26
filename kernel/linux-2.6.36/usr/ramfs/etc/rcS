@@ -1,0 +1,303 @@
+#!/bin/sh
+
+uperr() {
+	killall diskled
+
+	# turn on red
+	gpio 1 0
+	gpio 2 1
+	gpio 3 1
+
+	while true
+	do
+		sleep 1
+	done
+}
+
+upnor() {
+	echo -n "Burning Full Image..."
+	mtd write brcm${surfix_ver}_nor.bin firmware >& /dev/null
+	if [ $? -eq 0 ]; then
+		echo "Done"
+	else
+		uperr
+	fi
+
+	rm -rf brcm${surfix_ver}_nor.bin
+}
+
+upfacfw() {
+	echo -n "Burning Full Image In Fac Mode..."
+	mtd write brcm${surfix_ver}_fac_update_nor.bin firmware >& /dev/null
+	mtd write nvram_fac.bin nvram >& /dev/null
+	if [ $? -eq 0 ]; then
+		echo "Done"
+	else
+		uperr
+	fi
+
+	rm -rf brcm${surfix_ver}_fac_update_nor.bin
+	rm -rf nvram_fac.bin
+}
+
+upker() {
+	flag=`nvram get flag_boot_rootfs`
+	if [ "$flag" = "1" ]; then
+		echo -n "Burning Linux Kernel 1st Image..."
+		mtd write vmlinuz.trx os >& /dev/null
+		if [ $? -eq 0 ]; then
+			echo "Done"
+		else
+			uperr
+		fi
+
+		echo -n "Burning Linux Kernel 2nd Image..."
+		mtd write vmlinuz.trx os1 >& /dev/null
+		if [ $? -eq 0 ]; then
+			echo "Done"
+		else
+			uperr
+		fi
+	else
+		echo -n "Burning Linux Kernel 2nd Image..."
+		mtd write vmlinuz.trx os1 >& /dev/null
+		if [ $? -eq 0 ]; then
+			echo "Done"
+		else
+			uperr
+		fi
+
+		echo -n "Burning Linux Kernel 1st Image..."
+		mtd write vmlinuz.trx os >& /dev/null
+		if [ $? -eq 0 ]; then
+			echo "Done"
+		else
+			uperr
+		fi
+	fi
+	rm -rf vmlinuz.trx
+}
+
+upss() {
+	echo -n "Burning SQUASHFS Image..."
+	mtd erase overlay
+	mtd write root.squashfs squashfs >& /dev/null
+	if [ $? -eq 0 ]; then
+		echo "Done"
+	else
+		uperr
+	fi
+
+	rm -rf root.squashfs
+}
+
+format() {
+echo -n "Erase All Data on the DISK..."
+fdisk /dev/sda >& /dev/null <<EOF
+d
+1
+d
+2
+d
+3
+d
+w
+EOF
+echo "Done"
+
+echo -n "Partition the DISK..."
+fdisk -u /dev/sda >& /dev/null <<EOF
+n
+p
+1
+2048
+272648
+n
+p
+2
+272649
+543249
+n
+p
+3
+543250
+1084450
+n
+p
+1084451
+
+w
+EOF
+
+nvram set flag_format_disk3=1
+nvram set flag_format_disk4=1
+nvram commit
+echo "Done"
+}
+
+upfs() {
+	([ -b /dev/sda ] && [ -b /dev/sdb ]) || {
+		rm -rf root.ext4*
+		echo "no valid partition!!!"
+
+		uperr
+	}
+
+	#unpack file
+	unlzma root.ext4.lzma || {
+		rm -rf root.ext4*
+		echo "decompress error!!!"
+
+		uperr
+	}
+
+	format
+
+	md5org=`md5sum root.ext4 | awk '{print $1}'`
+	[ -b /dev/sda1 ] && {
+		echo -n "Burning 1st Block [/dev/sda1]..."
+		dd if=root.ext4 of=/dev/sda1 bs=2048 count=65536 >& /dev/null
+		echo "Done"
+	}
+
+	[ -b /dev/sda2 ] && {
+		echo -n "Burning 2nd Block [/dev/sda2]..."
+		dd if=root.ext4 of=/dev/sda2 bs=2048 count=65536 >& /dev/null
+		echo "Done"
+	}
+
+	rm -rf root.ext4
+	sync
+
+	echo -n "Verify Burning..."
+	[ -b /dev/sda1 ] && {
+		dd if=/dev/sda1 of=root.ext4 bs=2048 count=65536 >& /dev/null
+		md5new1=`md5sum root.ext4 | awk '{print $1}'`
+		rm -rf root.ext4
+	}
+
+	[ -b /dev/sda2 ] && {
+		dd if=/dev/sda2 of=root.ext4 bs=2048 count=65536 >& /dev/null
+		md5new2=`md5sum root.ext4 | awk '{print $1}'`
+		rm -rf root.ext4
+	}
+
+	if [ "$md5org" = "$md5new1" -a "$md5org" = "$md5new2" ]; then
+		echo "O.K."
+	else
+		echo "Failed!!! CS:$md5org -> CS1: $md5new1 CS2: $md5new2"
+		uperr
+	fi
+}
+
+model=`nvram get model`
+if [ -z "$model" ]; then
+	model=`cat /proc/xiaoqiang/model`
+fi
+
+if [ "$model" = "R1D" ]; then
+	surfix_ver=4709
+fi
+if [ "$model" = "R1AC" ]; then
+	surfix_ver=47081
+fi
+
+flg=`nvram get flag_reboot_system`
+if [ "$flg" = 1 ]; then
+	nvram unset flag_reboot_system
+	nvram commit
+	/sbin/reboot
+fi
+
+if [ "$flg" = 2 ]; then
+	nvram unset flag_reboot_system
+	nvram commit
+
+	diskled &
+
+	if [ -b /dev/sda ]; then
+		dev="/dev/sdb"
+	else
+		dev="/dev/sda"
+	fi
+
+	insmod /lib/modules/usb-storage.ko
+	sleep 4
+
+	[ -b $dev ] || {
+		echo "no $dev found, reboot..."
+		/sbin/reboot
+	}
+
+	# resize tmpfs
+	umount /tmp
+	mount -t tmpfs none /tmp -o size=90% >& /dev/null
+
+	for node in `ls $dev*`; do
+		[ "$node" = "$dev" ] && continue
+		mkdir -p /mnt/$node
+		mount $node /mnt/$node
+		if [ $? -eq 0 ]; then
+			bin="$bin `ls /mnt/$node/*.bin`"
+		fi
+	done
+
+	cd /tmp
+	for img in $bin; do
+		[ -z "$img" ] && continue
+
+		# ignore size > 128M
+		size=`ls -l $img | awk '{print $3}'`
+		[ $size -ge 134217728 ] && continue
+
+		sn=`nvram get SN`
+		mkxqimage -x $img -S $sn
+		if [ $? -ne 0 ]; then
+			echo "Check file $img error!!!"
+
+			# clean duty data and continue
+			rm -rf *
+			continue
+		fi
+
+		if [ -f upsetting.sh ]; then
+			#check bash file
+			flg_head=`cat upsetting.sh | head -c 9`
+			if [ "$flg_head" = "#!/bin/sh" ]; then
+				echo "flash setting..."
+				chmod 755 upsetting.sh
+				. ./upsetting.sh
+			fi
+		elif [ -f upsetting_fac1.sh ]; then
+			chmod 755 upsetting_fac1.sh
+			echo "flash upsetting_fac1.sh..."
+			. ./upsetting_fac1.sh
+		elif [ -f upsetting_fac2.sh ]; then
+			chmod 755 upsetting_fac2.sh
+			echo "flash upsetting_fac2.sh..."
+			. ./upsetting_fac2.sh
+		elif [ -f upsetting_fac3.sh ]; then
+			chmod 755 upsetting_fac3.sh
+			echo "flash upsetting_fac3.sh..."
+			. ./upsetting_fac3.sh
+		elif [ -f brcm${surfix_ver}_fac_update_nor.bin ] && [ -f nvram_fac.bin ]; then
+			echo "update fac FW..."
+			upfacfw
+		else
+			echo "update parts"
+			[ -f vmlinuz.trx ] && upker
+			[ -f root.squashfs ] && upss
+			[ -f root.ext4.lzma ] && upfs
+			[ -f brcm${surfix_ver}_nor.bin ] && upnor
+
+			nvram set flag_try_sys1_failed=0
+			nvram set flag_try_sys2_failed=0
+			nvram set restore_defaults=1
+			nvram commit
+		fi
+
+		/sbin/reboot
+	done
+
+	/sbin/reboot
+fi

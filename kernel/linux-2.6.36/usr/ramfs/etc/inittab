@@ -1,0 +1,2 @@
+ttyS0::askfirst:-/bin/sh --login
+::sysinit:/etc/rcS

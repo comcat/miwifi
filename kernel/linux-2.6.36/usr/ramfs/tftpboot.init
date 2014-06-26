@@ -1,0 +1,901 @@
+#!/bin/sh
+#
+# load by /init
+#
+klogger(){
+	local msg="$@"
+	test -z "$msg" && return 1
+	#echo "$msg"
+	echo "$msg" >> /dev/kmsg 2>/dev/null
+	return 0
+}
+pipelog(){
+	local oneline
+	while read oneline
+	do
+		klogger "$oneline"
+	done
+}
+#
+tftp_cleanup(){
+	cd /
+	nvram set flag_ota_reboot=1
+	nvram set flag_try_sys1_failed=0
+	nvram set flag_try_sys2_failed=0
+	nvram set flag_package_update=0
+	nvram set flag_boot_rootfs=0
+	nvram commit
+	setnet2vlan
+	setconsole 2>/dev/null
+	umount /rom 2>/dev/null
+	rm -f /tmp/rootfs.image.bin 2>/dev/null
+	rm -f /tmp/squash.image.bin 2>/dev/null
+	rm -f /tmp/kernel.image.bin 2>/dev/null
+	umount /tmp 2>/dev/null
+	return 0
+}
+#
+tftp_full_mount(){
+	lan_ipaddr=$(nvram get lan_ipaddr)
+	test -z "$lan_ipaddr" && lan_ipaddr="192.168.1.1"
+	lan_netmask=$(nvram get lan_netmask)
+	test -z "$lan_netmask" && lan_netmask="255.255.255.0"
+	setnet2trunk
+	if [ $? -ne 0 ]
+		then
+		klogger "******** TFTP NETWORK ABORT, NETWORK TRUNK CONFIGURE ERROR ********"
+		sleep 5
+		return 1
+	fi
+	exitcode=0
+	NETCFG="ifconfig eth0 $lan_ipaddr netmask $lan_netmask"
+	klogger "NETWORK: MAC: $(nvram get et0macaddr), $NETCFG"
+	klogger "vlan1ports: $(nvram get vlan1ports)"
+	klogger "vlan2ports: $(nvram get vlan2ports)"
+	$NETCFG
+	exitcode=$?
+	if [ $exitcode -ne 0 ]
+		then
+		klogger "******** TFTP NETWORK ABORT, NETWORK IP CONFIGURE ERROR ********"
+		sleep 5
+		return 1
+	fi
+	ROOTFS_URL=$(nvram get ROOTFS_URL)
+	test -z "$ROOTFS_URL" && ROOTFS_URL="192.168.1.2 -g -r root.tftp.squashfs"
+	klogger "Loading rootfs image from $ROOTFS_URL ..."
+	dlcode=0
+	if [ -n "$(echo "$ROOTFS_URL" | awk '/ftp:\/\//')" -o -n "$(echo "$ROOTFS_URL" | awk '/http:\/\//')" ]
+		then
+		cd /tmp && wget "$ROOTFS_URL" -O rootfs.image.bin
+		dlcode=$?
+	else
+		if [ -n "$(echo "$ROOTFS_URL" | awk '/-g /')" ]
+			then
+			#tftp ROOTFS_URL = '192.168.1.2 -g -r root.squashfs'
+			cd /tmp && tftp $ROOTFS_URL -l "rootfs.image.bin"
+			dlcode=$?
+		else
+			klogger "ERROR: unknow protocol: $ROOTFS_URL"
+			dlcode=1
+		fi
+	fi
+	if [ $dlcode -ne 0 ]
+		then
+		cd /
+		klogger "******** TFTP NETWORK ABORT, ROOTFS IMAGE DOWNLOAD ERROR ********"
+		klogger "TMPFS_SIZE TOO SMALL OR NETWORK ERROR: $TMPFS_SIZE"
+		df -h
+		sleep 5
+		return 1
+	fi
+	mkdir -p /rom
+	#ls -alh /tmp/rootfs.image.bin
+	ROOTMOUNT="mount -o loop,ro -t squashfs /tmp/rootfs.image.bin /rom"
+	sleep 1
+	$ROOTMOUNT
+	if [ $? -ne 0 ]
+		then
+		cd /
+		klogger " * "
+		klogger " *** $ROOTMOUNT *** "
+		klogger " * "
+		klogger "******** TFTP NETWORK ABORT, ROOTFS IMAGE MOUNT ERROR ********"
+		sleep 5
+		return 1
+	fi
+	#
+	sleep 3
+	#
+	#ls -alh /rom
+	#
+	mkdir -p /etc/ 2>/dev/null
+	ln -sf /proc/mounts /etc/mtab 2>/dev/null
+	#
+	return 0
+}
+#
+tftpfullupgrade(){
+	#upgrade cfe/os/os1/squashfs/sda1/sda2
+	#
+	#nvram set TFTP_UPGRADE_DONE='';nvram set flag_tftp_booted='false';nvram commit
+	nvram set TFTP_UPGRADE_DONE='';nvram commit
+	#
+	klogger " * Press Ctrl+C to cancel tftp upgrade ..."
+	klogger " * "
+	rd -w 5
+	if [ $? -eq 0 ]
+		then
+		return 1
+	fi
+	#
+	# 1 red
+	# 2 yellow
+	# 3 blue
+	# light yellow
+	gpio 1 1
+	gpio 3 1
+	gpio 2 0
+	#
+	insmod /lib/modules/usb-storage.ko 2>/dev/null
+	#
+	klogger "******** TFTP UPGRADE ********"
+	klogger " * "
+	TMPFS_SIZE=$(nvram get TMPFS_SIZE)
+	[ -z "$TMPFS_SIZE" ] && TMPFS_SIZE="128m"
+	klogger "TMPFS_SIZE: $TMPFS_SIZE"
+	#klogger "TMP: mount -t tmpfs none /tmp -o size=${TMPFS_SIZE}"
+	mkdir -p /tmp && mkdir -p /rom && mount -t tmpfs none /tmp -o size="${TMPFS_SIZE}" && cd /tmp
+	if [ $? -ne 0 ]
+		then
+		klogger "******** TFTP UPGRADE ABORT, TMPFS MOUNT ERROR ********"
+		sleep 5
+		return 1
+	fi
+	#
+	tftp_full_mount
+	if [ $? -ne 0 ]
+		then
+		return 1
+	fi
+	# 1 red
+	# 2 yellow
+	# 3 blue
+	# light yellow
+	gpio 1 1
+	gpio 3 1
+	gpio 2 0
+	#
+	#
+	old_ld_path="$LD_LIBRARY_PATH"
+	old_path="$PATH"
+	export LD_LIBRARY_PATH="/lib/:/usr/lib/:/rom/lib/:/rom/usr/lib/:/rom/lib/:/rom/usr/lib/:$old_ld_path"
+	export PATH="/bin:/sbin:/usr/bin:/usr/sbin:/rom/bin:/rom/sbin:/rom/usr/bin:/rom/usr/sbin:/rom/bin:/rom/sbin:/rom/usr/bin:/rom/usr/sbin:$old_path"
+	#
+	klogger " * "
+	rescueshell
+	klogger " * "
+	#
+	dotftpupgrade
+	upcode=$?
+	if [ $upcode -ne 0 ]
+		then
+		# 1 red
+		# 2 yellow
+		# 3 blue
+		# light red
+		gpio 3 1
+		gpio 2 1
+		gpio 1 0
+	else
+		# 1 red
+		# 2 yellow
+		# 3 blue
+		# light blue
+		gpio 1 1
+		gpio 2 1
+		gpio 3 0
+	fi
+	#
+	#
+	klogger " * "
+	rescueshell
+	klogger " * "
+	#
+	return $upcode
+}
+#
+# 1. load kernel from tftp and boot
+# 2. if [ -n TFTP_UPGRADE_DEVICE_LIST ] load rootfs from tftp and mount and sync to /dev/sda1
+# 3. mount /dev/sda1(rw) and switch_root to /dev/sda1
+#
+# kernel upgrade: nvram set TFTP_UPGRADE_MTD_LIST="os os2"
+# nvram set KERNEL_URL="192.168.1.2 -g -r vmlinuz.trx";nvram commit;
+# mtd write vmlinuz.trx os
+#
+tftpboot_mount_rootfs(){
+	#
+	#flag_tftp_booted will reset by boot loader
+	#
+	if [ ! -b /dev/sda ]; then
+		klogger "INFO: Active usb-storage ..."
+		insmod /lib/modules/usb-storage.ko 2>/dev/null
+		sleep 3
+	fi
+	klogger " * "
+	boardversion=`nvram get model`
+	if [ -z "$boardversion" ]; then
+		boardversion=`cat /proc/xiaoqiang/model 2>/dev/null`
+		if [ -z "$boardversion" ]
+			then
+			boardversion='unknow_board'
+		else
+			nvram set model="$boardversion" && nvram commit
+		fi
+	fi
+	test -z "$boardversion" && boardversion='unknow_board'
+	gpiobtn=`cat /proc/xiaoqiang/reset`
+	rst=`gpio $gpiobtn | awk '{print $3}'`
+	klogger "BOARD: ${boardversion}"
+	klogger "RESET: $gpiobtn -- $rst (<0>R)"
+	klogger " * "
+	if [ "$(nvram get flag_tftp_bootup)" != 'on' -o "$(nvram get flag_tftp_booted)" != 'true' ]
+	then
+		klogger " * NO TFTP BOOT *"
+		return 0
+	fi
+	#
+	gpio 1 1
+	gpio 2 1
+	gpio 3 1
+	#
+	setconsole nvram 2>/dev/null
+	#
+	tftpfullupgrade
+	if [ $? -ne 0 ]
+		then
+		nvram set flag_tftp_booted='false'
+		# flag_boot_type: 1 system in SATA   version
+		#                 2 system in SQUASH version
+		nvram set flag_boot_type=1
+		echo 1 > /sys/power/boot_status
+		nvram commit
+	fi
+	tftp_cleanup
+	return $?
+	#
+	klogger "Press Ctrl+C to cancel tftp boot upgrade ..."
+	klogger " * "
+	sleep 1
+	rd -w 3
+	if [ $? -eq 0 ]
+		then
+		klogger " * "
+		nvram set flag_tftp_booted='false';nvram commit;
+		return 0
+	fi
+	#
+	nvram set TFTP_UPGRADE_DONE='';nvram commit
+	#
+	insmod /lib/modules/usb-storage.ko 2>/dev/null
+	#
+	klogger " * "
+	klogger "******** TFTP BOOT ********"
+	klogger " * "
+	TMPFS_SIZE=$(nvram get TMPFS_SIZE)
+	[ -z "$TMPFS_SIZE" ] && TMPFS_SIZE="128m"
+	klogger "TMPFS_SIZE: $TMPFS_SIZE"
+	#klogger "TMP: mount -t tmpfs none /tmp -o size=${TMPFS_SIZE}"
+	mkdir -p /tmp && mkdir -p /rom && mount -t tmpfs none /tmp -o size="${TMPFS_SIZE}" && cd /tmp
+	if [ $? -ne 0 ]
+		then
+		cd /
+		umount /tmp
+		klogger "******** TFTP BOOT ABORT, TMPFS MOUNT ERROR ********"
+		nvram set flag_tftp_booted='false';nvram commit;
+		sleep 15
+		return 1
+	fi
+	#
+	tftp_root_mount
+	if [ $? -ne 0 ]
+		then
+		cd /
+		umount /rom 2>/dev/null
+		umount /rom 2>/dev/null
+		umount /tmp 2>/dev/null
+		klogger "******** TFTP BOOT ABORT, ROOT MOUNT ERROR ********"
+		nvram set flag_tftp_booted='false';nvram commit;
+		sleep 15
+		return 1
+	fi
+	#
+	old_ld_path="$LD_LIBRARY_PATH"
+	old_path="$PATH"
+	export LD_LIBRARY_PATH="/lib/:/usr/lib/:/rom/lib/:/rom/usr/lib/:/rom/lib/:/rom/usr/lib/:$old_ld_path"
+	export PATH="/bin:/sbin:/usr/bin:/usr/sbin:/rom/bin:/rom/sbin:/rom/usr/bin:/rom/usr/sbin:/rom/bin:/rom/sbin:/rom/usr/bin:/rom/usr/sbin:$old_path"
+	#
+	if [ "$(nvram get TFTP_UPGRADE)" = 'true' ]
+		then
+		dotftpupgrade
+	fi
+	klogger " * "
+	klogger " * "
+	klogger " * "
+	mkdir -p /etc/ 2>/dev/null
+	ln -sf /proc/mounts /etc/mtab 2>/dev/null
+	#
+	ROOTFS_OPT="$(nvram get ROOTFS_OPT)"
+	test -z "$ROOTFS_OPT" && ROOTFS_OPT='-t ext4'
+	ROOTFS_DEV="$(nvram get ROOTFS_DEV)"
+	test -z "$ROOTFS_DEV" && ROOTFS_DEV='/dev/sda1'
+	#
+	nvram get TFTP_UPGRADE_DONE | grep -q "$ROOTFS_DEV"
+	if [ $? -ne 0 ]
+		then
+		#sync new root to ROOTFS_DEV
+		klogger " * FORMATTING $ROOTFS_DEV * "
+		mkfs.ext4 -v -j -N 10240 -T largefile $ROOTFS_DEV 2>&1
+		if [ $? -ne 0 ]
+		then
+			cd /
+			umount /tmp
+			klogger "******** TFTP BOOT ABORT, FORMATTING $ROOTFS_DEV ERROR ********"
+			nvram set flag_tftp_booted='false';nvram commit;
+			sleep 15
+			return 1
+		fi
+		disk_root_mount || return 1
+		klogger " * SYNC NEW ROOT TO $ROOTFS_DEV * "
+		cp -av /rom/* /rom/ 2>&1 | pipelog
+		if [ $? -ne 0 ]
+		then
+			cd /
+			umount /tmp
+			klogger "******** TFTP BOOT ABORT, SYNC ROOT ERROR ********"
+			nvram set flag_tftp_booted='false';nvram commit;
+			sleep 15
+			return 1
+		fi
+	else
+		disk_root_mount || return 1
+		klogger " * $ROOTFS_DEV SYNC ALREADY DONE * "
+	fi
+	klogger " * "
+	rescueshell
+	klogger " * "
+	#
+	umount /rom 2>/dev/null
+	#
+	setnet2vlan
+	#
+	tftpinitrc="/lib/preinit.sh"
+	if [ -x /rom/lib/rescueinit ]
+		then
+		tftpinitrc="/lib/rescueinit"
+	fi
+	if [ -x "/rom/$tftpinitrc" ]
+		then
+		klogger "flag_tftp_bootup: $(nvram get flag_tftp_bootup)"
+		klogger "flag_tftp_booted: $(nvram get flag_tftp_booted)"
+		klogger "switch to tftp system($ROOTFS_DEV) by $tftpinitrc ..."
+		#do not need commit
+		#type = 1, root fs in sata
+		#type = 2, root fs in mtd squash
+		#type = 9, root fs in tftp squash
+		nvram set flag_boot_type=1
+		nvram set flag_ota_reboot=1
+		nvram set flag_try_sys1_failed=0
+		nvram set flag_try_sys2_failed=0
+		nvram set flag_package_update=0
+		nvram commit
+		setconsole 2>/dev/null
+		exec switch_root /rom $tftpinitrc
+	else
+		klogger "ERROR: /rom/$tftpinitrc no executable."
+		klogger "ERROR: can not switch to tftp system($ROOTFS_DEV) by $tftpinitrc."
+	fi
+	cd /
+	klogger " * "
+	klogger "******** TFTP BOOT ABORT, SWITCH_ROOT ERROR ********"
+	nvram set flag_boot_type=0
+	nvram set flag_tftp_booted='false';nvram commit;
+	umount /rom >/dev/null 2>&1
+	umount /tmp >/dev/null 2>&1
+	return 1
+	#exec /sbin/init
+}
+#
+setconsole(){
+	local setype="$1"
+	needreboot=0
+	if [ "$setype" != 'nvram' ]
+		then
+		if [ "$(bdata get uart_en)" != '1' ]
+			then
+			bdata set uart_en=1 && bdata sync && bdata commit
+			if [ $? -ne 0 ]
+				then
+				klogger "ERROR: bdata set uart_en=1 failed."
+			else
+				klogger "WARNING: rebooting for bdata set uart_en=1 ..."
+				needreboot=1
+			fi
+		fi
+		if [ "$(bdata get ssh_en)" != '1' ]
+			then
+			bdata set ssh_en=1 && bdata sync && bdata commit
+			if [ $? -ne 0 ]
+				then
+				klogger "ERROR: bdata set ssh_en=1 failed."
+			else
+				klogger "WARNING: rebooting for bdata set ssh_en=1 ..."
+				needreboot=1
+			fi
+		fi
+		bdata sync
+	fi
+	if [ "$(nvram get uart_en)" != '1' ]
+		then
+		nvram set uart_en=1 && nvram commit
+		if [ $? -ne 0 ]
+			then
+			klogger "ERROR: nvram set uart_en=1 failed."
+		else
+			klogger "WARNING: rebooting for nvram set uart_en=1 ..."
+			needreboot=1
+		fi
+	fi
+	if [ "$(nvram get ssh_en)" != '1' ]
+		then
+		nvram set ssh_en=1 && nvram commit
+		if [ $? -ne 0 ]
+			then
+			klogger "ERROR: nvram set ssh_en=1 failed."
+		else
+			klogger "WARNING: rebooting for nvram set ssh_en=1 ..."
+			needreboot=1
+		fi
+	fi
+	if [ $needreboot -ne 0 ]
+		then
+		sleep 5
+		sync
+		cpureset -w 3
+		reboot
+	fi
+}
+getmtdblockdevbyname(){
+	local name
+	name="$1"
+	test -z "$name" && return 1
+	devnum=$(cat /proc/mtd | awk "/\"$name\"/"| awk -F':' '{print $1}' | awk -F'mtd' '{print $2}')
+	test -z "$devnum" && return 1
+	if [ -e "/dev/mtdblock${devnum}" ]
+		then
+		echo "/dev/mtdblock${devnum}"
+		return 0
+	else
+		return 1
+	fi
+}
+#
+rescueshell(){
+	klogger ""
+	klogger "Press Ctrl+C to rescue shell ..."
+	klogger ""
+	sleep 1
+	/rom/usr/sbin/waitctlc -v -w 5
+	if [ $? -eq 0 ]
+		then
+		loopsh=1
+		while [ $loopsh -eq 1 ]
+		do
+			cd / && /rom/bin/sh
+			klogger " * "
+			klogger "Press Ctrl+C to exit rescue shell ..."
+			klogger " * "
+			sleep 1
+			/rom/usr/sbin/waitctlc -v -w 5
+			if [ $? -eq 0 ]
+				then
+				loopsh=0
+			fi
+		done
+	else
+		klogger " * "
+		klogger " * continue ... "
+	fi
+	return 0
+}
+#
+setnet2trunk() {
+	#
+	rmmod et 2>/dev/null
+	sleep 1
+	#
+	#set to "0 1 2 3 5u" for ramfs network only, do not commit
+	nvram set vlan1ports="0 2 5u"
+	nvram set vlan2ports="4 5"
+	insmod /lib/modules/et.ko 2>/dev/null
+	if [ $? -ne 0 ]
+		then
+		klogger "WARNING: insmod et for ramfs networking failed."
+		return 1
+	fi
+	return 0
+}
+#
+setnet2vlan() {
+	#
+	rmmod et 2>/dev/null
+	sleep 1
+	#
+	nvram set vlan1ports="0 2 5*"
+	nvram set vlan2ports="4 5"
+	nvram commit
+	insmod /lib/modules/et.ko 2>/dev/null
+	if [ $? -ne 0 ]
+		then
+		klogger "WARNING: insmod et for ramfs networking failed."
+		return 1
+	fi
+	return 0
+}
+#
+disk_root_mount(){
+	ROOTMOUNT="mount $ROOTFS_OPT $ROOTFS_DEV /rom"
+	klogger "******** TFTP BOOT: $ROOTMOUNT ********"
+	mkdir -p /rom && $ROOTMOUNT
+	if [ $? -ne 0 ]
+		then
+		cd /
+		umount /tmp
+		klogger "******** TFTP BOOT ABORT, ROOT MOUNT ERROR ********"
+		nvram set flag_tftp_booted='false';nvram commit;
+		sleep 15
+		return 1
+	fi
+	return 0
+}
+#
+tftp_root_mount(){
+	lan_ipaddr=$(nvram get lan_ipaddr)
+	test -z "$lan_ipaddr" && lan_ipaddr="192.168.1.1"
+	lan_netmask=$(nvram get lan_netmask)
+	test -z "$lan_netmask" && lan_netmask="255.255.255.0"
+	setnet2trunk
+	if [ $? -ne 0 ]
+		then
+		klogger "******** TFTP NETWORK ABORT, NETWORK TRUNK CONFIGURE ERROR ********"
+		sleep 15
+		return 1
+	fi
+	exitcode=0
+	NETCFG="ifconfig eth0 $lan_ipaddr netmask $lan_netmask"
+	klogger "NETWORK: MAC: $(nvram get et0macaddr), $NETCFG"
+	klogger "vlan1ports: $(nvram get vlan1ports)"
+	klogger "vlan2ports: $(nvram get vlan2ports)"
+	$NETCFG
+	exitcode=$?
+	if [ $exitcode -ne 0 ]
+		then
+		klogger "******** TFTP NETWORK ABORT, NETWORK IP CONFIGURE ERROR ********"
+		sleep 15
+		return 1
+	fi
+	ROOTFS_URL=$(nvram get ROOTFS_URL)
+	test -z "$ROOTFS_URL" && ROOTFS_URL="192.168.1.2 -g -r root.tftp.squashfs"
+	klogger "Loading rootfs image from $ROOTFS_URL ..."
+	dlcode=0
+	if [ -n "$(echo "$ROOTFS_URL" | awk '/ftp:\/\//')" -o -n "$(echo "$ROOTFS_URL" | awk '/http:\/\//')" ]
+		then
+		cd /tmp && wget "$ROOTFS_URL" -O rootfs.image.bin
+		dlcode=$?
+	else
+		if [ -n "$(echo "$ROOTFS_URL" | awk '/-g /')" ]
+			then
+			#tftp ROOTFS_URL = '192.168.1.2 -g -r root.squashfs'
+			cd /tmp && tftp $ROOTFS_URL -l "rootfs.image.bin"
+			dlcode=$?
+		else
+			klogger "ERROR: unknow protocol: $ROOTFS_URL"
+			dlcode=1
+		fi
+	fi
+	if [ $dlcode -ne 0 ]
+		then
+		cd /
+		klogger "******** TFTP NETWORK ABORT, ROOTFS IMAGE DOWNLOAD ERROR ********"
+		klogger "TMPFS_SIZE TOO SMALL OR NETWORK ERROR: $TMPFS_SIZE"
+		df -h
+		sleep 15
+		return 1
+	fi
+	mkdir -p /rom
+	#ls -alh /tmp/rootfs.image.bin
+	ROOTMOUNT="mount -o loop,ro -t squashfs /tmp/rootfs.image.bin /rom"
+	sleep 1
+	$ROOTMOUNT
+	if [ $? -ne 0 ]
+		then
+		cd /
+		klogger " * "
+		klogger " *** $ROOTMOUNT *** "
+		klogger " * "
+		klogger "******** TFTP NETWORK ABORT, ROOTFS IMAGE MOUNT ERROR ********"
+		sleep 15
+		return 1
+	fi
+	#
+	sleep 3
+	#
+	#ls -alh /rom
+	#
+	mkdir -p /etc/ 2>/dev/null
+	ln -sf /proc/mounts /etc/mtab 2>/dev/null
+	#
+	return 0
+}
+#
+initialdisk() {
+[ -b /dev/sda ] || return 1
+
+echo -n "Erase All Data on the DISK /dev/sda ..."
+fdisk /dev/sda >& /dev/null <<EOF
+d
+1
+d
+2
+d
+3
+d
+w
+EOF
+echo "Done"
+
+echo -n "Partition the DISK..."
+fdisk -u /dev/sda >& /dev/null <<EOF
+n
+p
+1
+2048
+272648
+n
+p
+2
+272649
+543249
+n
+p
+3
+543250
+1084450
+n
+p
+1084451
+
+w
+EOF
+
+nvram set flag_format_disk3=1
+nvram set flag_format_disk4=1
+nvram commit
+echo " * fdisk done *"
+}
+dotftpupgrade(){
+	#double check
+	TFTP_UPGRADE_DEVICE_LIST="$(nvram get TFTP_UPGRADE_DEVICE_LIST)"
+	test -z "$TFTP_UPGRADE_DEVICE_LIST" && TFTP_UPGRADE_DEVICE_LIST="/dev/sda1 /dev/sda2"
+	#
+
+	if [ "$(nvram get TFTP_UPGRADE)" != 'true' ]
+		then
+		TFTP_UPGRADE_DEVICE_LIST='/dev/sda1'
+	fi
+	fullupgrade=0
+	if [ ! -b /dev/sda1 -a ! -b /dev/sda2 ]
+		then
+		klogger " Initial /dev/sda for /dev/sda1 and /dev/sda2 no exist."
+		initialdisk 2>&1 | pipelog
+		TFTP_UPGRADE_DEVICE_LIST="/dev/sda1 /dev/sda2"
+		fullupgrade=1
+	fi
+	klogger " * "
+	klogger "******** TFTP UPGRADE: $TFTP_UPGRADE_DEVICE_LIST ********"
+	klogger " * "
+	#
+	SYNC_ROOTFS_OPT="$(nvram get SYNC_ROOTFS_OPT)"
+	[ -z "$SYNC_ROOTFS_OPT" ] && SYNC_ROOTFS_OPT='-t ext4'
+	SYNC_FORMAT_CMD="$(nvram get SYNC_FORMAT_CMD)"
+	[ -z "$SYNC_FORMAT_CMD" ] && SYNC_FORMAT_CMD='mkfs.ext4 -v -j -N 10240 -T largefile'
+	rootfscnt=0
+	rootlist=''
+	for onesyndev in $TFTP_UPGRADE_DEVICE_LIST
+	do
+		if [ ! -b "$onesyndev" ]
+			then
+			klogger " * "
+			klogger "WARNING: can not upgrade $onesyndev, device no exist or is not block device"
+			klogger " * "
+			continue
+		fi
+		klogger "upgrading $onesyndev"
+		$SYNC_FORMAT_CMD $onesyndev 2>&1
+		if [ $? -ne 0 ]
+			then
+			klogger "WARNING: $SYNC_FORMAT_CMD $onesyndev failed."
+			continue
+		fi
+		mkdir -p /sync_rom && mount $SYNC_ROOTFS_OPT $onesyndev /sync_rom
+		if [ $? -ne 0 ]
+			then
+			klogger "WARNING: mount $SYNC_ROOTFS_OPT $onesyndev /sync_rom failed."
+			continue
+		fi
+		cp -av /rom/* /sync_rom/
+		if [ $? -ne 0 ]
+			then
+			klogger "ERROR: upgrade $onesyndev failed."
+		else
+			let rootfscnt=$rootfscnt+1
+			if [ -z "$rootlist" ]
+				then
+				rootlist="$onesyndev"
+			else
+				rootlist="$rootlist $onesyndev"
+			fi
+		fi
+		umount /sync_rom
+	done
+	TFTP_UPGRADE_MTD_LIST="$(nvram get TFTP_UPGRADE_MTD_LIST)"
+	[ -z "$TFTP_UPGRADE_MTD_LIST" ] && TFTP_UPGRADE_MTD_LIST='os os1'
+	if [ "$(nvram get TFTP_UPGRADE)" != 'true' ]
+		then
+		TFTP_UPGRADE_MTD_LIST='os'
+	fi
+	test $fullupgrade -eq 1 && TFTP_UPGRADE_MTD_LIST='os os1'
+	KERNEL_URL=$(nvram get KERNEL_URL)
+	test -z "$KERNEL_URL" && KERNEL_URL="192.168.1.2 -g -r vmlinuz.trx"
+	klogger "Loading kernel image from $KERNEL_URL ..."
+	dlcode=0
+	if [ -n "$(echo "$KERNEL_URL" | awk '/ftp:\/\//')" -o -n "$(echo "$KERNEL_URL" | awk '/http:\/\//')" ]
+		then
+		cd /tmp && wget "$KERNEL_URL" -O kernel.image.bin
+		dlcode=$?
+	else
+		if [ -n "$(echo "$KERNEL_URL" | awk '/-g /')" ]
+			then
+			#tftp KERNEL_URL = '192.168.1.2 -g -r root.squashfs'
+			cd /tmp && tftp $KERNEL_URL -l "kernel.image.bin"
+			dlcode=$?
+		else
+			klogger "ERROR: unknow protocol: $KERNEL_URL"
+			dlcode=1
+		fi
+	fi
+	if [ $dlcode -ne 0 ]
+		then
+		cd /
+		klogger "******** TFTP UPGRADE ABORT, KERNEL IMAGE DOWNLOAD ERROR ********"
+		klogger "TMPFS_SIZE TOO SMALL OR NETWORK ERROR: $TMPFS_SIZE"
+		df -h
+		sleep 15
+		return 1
+	fi
+	mtdcnt=0
+	mtdlist=''
+	for onesyndev in $TFTP_UPGRADE_MTD_LIST
+	do
+		mtdblock=$(getmtdblockdevbyname $onesyndev)
+		if [ -z "$mtdblock" -o ! -b "$mtdblock" ]
+			then
+			klogger " * "
+			klogger "WARNING: can not write new kernel to $onesyndev($mtdblock), device no exist or is not block device"
+			klogger " * "
+			continue
+		fi
+		klogger "sync new kernel to $onesyndev($mtdblock)"
+		mtd write /tmp/kernel.image.bin $onesyndev
+		if [ $? -ne 0 ]
+			then
+			klogger "WARNING: mtd write /tmp/kernel.image.bin $onesyndev($mtdblock) failed."
+		else
+			let mtdcnt=$mtdcnt+1
+			if [ -z "$mtdlist" ]
+				then
+				mtdlist="$onesyndev"
+			else
+				mtdlist="$mtdlist $onesyndev"
+			fi
+		fi
+	done
+	#
+	TFTP_UPGRADE_SQUASH_LIST="$(nvram get TFTP_UPGRADE_SQUASH_LIST)"
+	[ -z "$TFTP_UPGRADE_SQUASH_LIST" ] && TFTP_UPGRADE_SQUASH_LIST='squashfs'
+	if [ "$(nvram get TFTP_UPGRADE)" != 'true' ]
+		then
+		TFTP_UPGRADE_SQUASH_LIST=''
+	fi
+	test $fullupgrade -eq 1 && TFTP_UPGRADE_SQUASH_LIST='squashfs'
+	SQUASH_URL=$(nvram get SQUASH_URL)
+	test -z "$SQUASH_URL" && SQUASH_URL="192.168.1.2 -g -r root.squashfs"
+	if [ -n "$TFTP_UPGRADE_SQUASH_LIST" ]
+		then
+		klogger "Loading squash image from $SQUASH_URL ..."
+		dlcode=0
+		if [ -n "$(echo "$SQUASH_URL" | awk '/ftp:\/\//')" -o -n "$(echo "$SQUASH_URL" | awk '/http:\/\//')" ]
+			then
+			cd /tmp && wget "$SQUASH_URL" -O squash.image.bin
+			dlcode=$?
+		else
+			if [ -n "$(echo "$SQUASH_URL" | awk '/-g /')" ]
+				then
+				#tftp SQUASH_URL = '192.168.1.2 -g -r root.squashfs'
+				cd /tmp && tftp $SQUASH_URL -l "squash.image.bin"
+				dlcode=$?
+			else
+				klogger "ERROR: unknow protocol: $SQUASH_URL"
+				dlcode=1
+			fi
+		fi
+		if [ $dlcode -ne 0 ]
+			then
+			cd /
+			klogger "******** TFTP UPGRADE ABORT, SQUASH IMAGE DOWNLOAD ERROR ********"
+			klogger "TMPFS_SIZE TOO SMALL OR NETWORK ERROR: $TMPFS_SIZE"
+			df -h
+			sleep 15
+			return 1
+		fi
+		squashcnt=0
+		squashlist=''
+		for onesyndev in $TFTP_UPGRADE_SQUASH_LIST
+		do
+			mtdblock=$(getmtdblockdevbyname $onesyndev)
+			if [ -z "$mtdblock" -o ! -b "$mtdblock" ]
+				then
+				klogger "WARNING: can not write new squash to $onesyndev($mtdblock), device no exist or is not block device"
+				continue
+			fi
+			klogger "sync new squash to $onesyndev($mtdblock)"
+			mtd write /tmp/squash.image.bin $onesyndev
+			if [ $? -ne 0 ]
+				then
+				klogger "WARNING: mtd write /tmp/squash.image.bin $onesyndev($mtdblock) failed."
+			else
+				let squashcnt=$squashcnt+1
+				if [ -z "$squashlist" ]
+					then
+					squashlist="$onesyndev"
+				else
+					squashlist="$squashlist $onesyndev"
+				fi
+			fi
+		done
+	fi
+	#
+	cd /
+	klogger " * "
+	klogger " * "
+	klogger " * "
+	#rm -rf /tmp/* 2>/dev/null
+	klogger " * $mtdcnt MTD, $rootfscnt ROOT DEV * "
+	if [ $mtdcnt -gt 0 -a $rootfscnt -gt 0 ]
+		then
+		klogger " * "
+		klogger " * TFTP UPGRADE DONE: $mtdlist,$rootlist,$squashlist * "
+		nvram set TFTP_UPGRADE_DONE="$mtdlist,$rootlist,$squashlist";
+		nvram unset TFTP_UPGRADE
+		nvram commit
+		klogger " * "
+		return 0
+	else
+		klogger " * "
+		klogger " * TFTP UPGRADE FAILED * "
+		klogger " * "
+		test -b /dev/sda && sleep 30
+		return 1
+	fi
+	#
+}
+#

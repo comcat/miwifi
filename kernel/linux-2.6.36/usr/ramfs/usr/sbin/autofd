@@ -1,0 +1,240 @@
+#!/bin/sh
+
+
+# nvram setting
+#
+# @flag_package_update (1 by default)
+#
+#    which part: 1: rootfs
+#                2: kernel
+#                3: kernel + rootfs
+#    and         3: format all disk
+#                1 or 2: not format
+# @flag_local_ip    (auto by default)
+# @flag_server_ip   (192.168.1.1 by default)
+# @flag_trans_proto (1 by default)
+#                1: tftp
+#                2: ftp
+# @flag_image_name (brcm4709.img.tar by default)
+
+hndmsg() {
+	if [ -n "$msg" ]; then
+		echo "$msg"
+		echo "$msg" >> /dev/kmsg 2>/dev/null
+
+		echo $log > /proc/sys/kernel/printk
+		stty intr ^C
+		exit 1
+	fi
+}
+
+upnor() {
+	# Just check binary file
+	file=`ls *.bin` >& /dev/null
+	if [ -n "$file" -a -f "$img" ]; then
+		echo -n "Burning Full Image..."
+		mtd write $img firmware >& /dev/null
+		echo "Done"
+	fi
+}
+
+upker() {
+	if [ -f vmlinuz.trx ]; then
+		if [ -e /dev/mtd1 ]; then
+		    echo -n "Burning Linux Kernel 1st Image..."
+			mtd write vmlinuz.trx os >& /dev/null
+			echo "Done"
+	    fi
+
+		if [ -e /dev/mtd2 ]; then
+			echo -n "Burning Linux Kernel 2nd Image..."
+			mtd write vmlinuz.trx os1 >& /dev/null
+			echo "Done"
+		fi
+	fi
+}
+
+uprs() {
+	if [ -f ramfsz ]; then
+		if [ -e /dev/mtd3 ]; then
+		    echo -n "Burning RAMFS Image..."
+			mtd write ramfsz ramfs >& /dev/null
+			echo "Done"
+	    fi
+	fi
+}
+
+upcfe() {
+	if [ -f mice_cfe ]; then
+		if [ -e /dev/mtd0 ]; then
+		    echo -n "Burning CFE Image..."
+			mtd write mice_cfe boot >& /dev/null
+			echo "Done"
+	    fi
+	fi
+}
+
+upss() {
+	echo -n "Burning SQUASHFS Image..."
+	mtd erase overlay
+	mtd write root.squashfs squashfs >& /dev/null
+	echo "Done"
+}
+
+upfs() {
+	[ -b /dev/sda ] || return 1
+
+	diskled &
+
+	#unpack file
+	unlzma root.ext4.lzma
+
+#	echo -n "Verify ROOT filesystem Image: root.ext4..."
+#	gencs root.ext4 || msg="Checksum error[$4]!!!"
+#	echo "Checksum O.K."
+
+	md5org=`md5sum root.ext4 | awk '{print $1}'`
+	echo -n "Burning 1st Block [/dev/sda1]..."
+	dd if=root.ext4 of=/dev/sda1 bs=2048 count=65536 >& /dev/null
+	echo "Done"
+
+	echo -n "Burning 2nd Block [/dev/sda2]..."
+	dd if=root.ext4 of=/dev/sda2 bs=2048 count=65536 >& /dev/null
+	echo "Done"
+	rm -rf root.ext4
+	sync
+
+	echo -n "Verify Burning..."
+	dd if=/dev/sda1 of=root.ext4 bs=2048 count=65536 >& /dev/null
+	md5new1=`md5sum root.ext4 | awk '{print $1}'`
+	rm -rf root.ext4
+	dd if=/dev/sda2 of=root.ext4 bs=2048 count=65536 >& /dev/null
+	md5new2=`md5sum root.ext4 | awk '{print $1}'`
+	rm -rf root.ext4
+
+	killall diskled
+	gpio 3 1
+
+	if [ "$md5org" = "$md5new1" -a "$md5org" = "$md5new2" ]; then
+		echo "O.K."
+	else
+		echo "Failed!!! CS:$md5org -> CS1: $md5new1 CS2: $md5new2"
+		echo $log > /proc/sys/kernel/printk
+		stty intr ^C
+
+		exit 1
+	fi
+}
+
+format() {
+[ -b /dev/sda ] || return 1
+
+echo -n "Erase All Data on the DISK..."
+fdisk /dev/sda >& /dev/null <<EOF
+d
+1
+d
+2
+d
+3
+d
+w
+EOF
+echo "Done"
+
+echo -n "Partition the DISK..."
+fdisk -u /dev/sda >& /dev/null <<EOF
+n
+p
+1
+2048
+272648
+n
+p
+2
+272649
+543249
+n
+p
+3
+543250
+1084450
+n
+p
+1084451
+
+w
+EOF
+
+nvram set flag_format_disk3=1
+nvram set flag_format_disk4=1
+nvram commit
+echo "Done"
+}
+
+model=`nvram get model`
+if [ -z "$model" ]; then
+	model=`cat /proc/xiaoqiang/model`
+fi
+
+if [ "$model" = "R1D" ]; then
+	surfix_ver=4709
+fi
+if [ "$model" = "R1AC" ]; then
+	surfix_ver=47081
+fi
+
+stty intr undef
+
+log=`cat /proc/sys/kernel/printk`
+echo "0 0 0 0" > /proc/sys/kernel/printk
+
+lip=`nvram get flag_local_ip`
+sip=`nvram get flag_server_ip`
+flg=`nvram get flag_package_update`
+dwn=`nvram get flag_trans_proto`
+img=`nvram get flag_image_name`
+
+# default value setting
+[ -n "$lip" ] || (lip="auto" && nvram set flag_local_ip=$lip)
+[ -n "$sip" ] || (sip="192.168.1.1" && nvram set flag_server_ip=$sip)
+[ -n "$flg" ] || (flg="2" && nvram set flag_package_update=$flg)
+[ -n "$dwn" ] || (dwn="2" && nvram set flag_trans_proto=$dwn)
+[ -n "$img" ] || (img="brcm${surfix_ver}_hdd.bin" && nvram set flag_image_name=$img)
+
+if [ "$lip" != "auto" ]; then
+	ifconfig eth0 $lip up
+fi
+
+# Prepare the space
+mkdir -p /tmp/upxxx
+mount -t tmpfs none /tmp/upxxx -o size=90%
+cd /tmp/upxxx
+# ping -w 3 -c 3 $sip
+if [ "$dwn" = "1" ]; then
+	echo -n "Downloading(tftp) $img from $sip ..."
+	tftp $sip -g $img -l $img || msg="Can't get $img from TFTP server $sip!!!" >& /dev/null
+else
+	echo -n "Downloading(ftp) $img from $sip ..."
+	wget ftp://$sip/$img || msg="Can't get $img from FTP server $sip!!!" >& /dev/null
+fi
+hndmsg
+echo "Done"
+
+if [ "$flg" = "99" ]; then
+	upnor
+else
+	echo -n "Verify Image: $img..."
+	(mkxqimage -x $img && rm -rf $img) || msg="Check file $img error!!!" >& /dev/null
+	hndmsg
+	echo "Checksum O.K."
+
+	[ "$flg" = "1" ] && upfs
+	[ "$flg" = "2" ] && format && upfs
+	[ "$flg" = "3" ] && upker && uprs && upss && format && upfs
+fi
+
+echo $log > /proc/sys/kernel/printk
+stty intr ^C
+
+exit 0

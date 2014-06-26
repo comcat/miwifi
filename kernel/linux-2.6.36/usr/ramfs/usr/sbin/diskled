@@ -1,0 +1,10 @@
+#!/bin/sh
+
+while true
+do
+	gpio 2 0
+	dd if=/dev/zero of=/dev/null bs=1 count=256K >& /dev/null
+	
+	gpio 2 1
+	dd if=/dev/zero of=/dev/null bs=1 count=256K >& /dev/null
+done
