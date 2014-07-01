@@ -207,7 +207,7 @@ fi
 if [ "$(nvram get flag_tftp_bootup)" = 'on' -a "$(nvram get flag_tftp_booted)" = 'true' ]
 then
 	. /tftpboot.init
-	tftpboot_mount_rootfs
+	#tftpboot_mount_rootfs
 fi
 
 klogger "Press Ctrl+C to enter RAMFS..."
@@ -261,6 +261,16 @@ else
 	#gpio 1 1
 	#gpio 2 1
 	#gpio 3 1
+	
+	# flash the blue led
+	gpio 3 1
+	gpio 3 0
+	gpio 3 1
+	gpio 3 0
+	gpio 3 1
+	gpio 3 0
+	gpio 3 1
+	upnet
 
 	flag_try_sys1=`nvram get flag_try_sys1_failed`
 	flag_try_sys2=`nvram get flag_try_sys2_failed`
@@ -283,7 +293,7 @@ else
 			# boot_status: 1 sata mode
 			#              2 flash mode
 			upmount
-			exec switch_root /mnt /lib/preinit.sh
+			exec switch_root /mnt /sbin/init
 		else
 			if [ "$ft_mode" = "1" ]; then
 				# skip failed flag setting in FT mode
