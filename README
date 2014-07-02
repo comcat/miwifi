@@ -171,3 +171,67 @@ Closing network.
 Starting program at 0x00008000
 ......
 ......
+
+
+5. Debian Rootfs
+=================
+
+Install an ARM basic debian on your x86 machine, The following is validated in
+Ubuntu 12.04:
+
+  $ sudo apt-get install qemu-user-static
+
+ And create the core rootfs with the included debootstrap wrapper script:
+
+  $ sudo qemu-debootstrap --arch armel stable rootfs
+  I: Running command: debootstrap --arch armel --foreign stable rootfs
+  I: Retrieving Release
+  I: Retrieving Packages
+  I: Validating Packages
+  ...
+  ...
+  I: Base system installed successfully.
+
+The basic debian successfully created in rootfs directory. Now you can chroot
+into the rootfs:
+
+  $ sudo chroot ./rootfs
+
+  # ldd bin/bash 
+  libtinfo.so.5 => /lib/arm-linux-gnueabi/libtinfo.so.5 (0xf67af000)
+  libdl.so.2 => /lib/arm-linux-gnueabi/libdl.so.2 (0xf67a4000)
+  libgcc_s.so.1 => /lib/arm-linux-gnueabi/libgcc_s.so.1 (0xf677a000)
+  libc.so.6 => /lib/arm-linux-gnueabi/libc.so.6 (0xf6642000)
+  /lib/ld-linux.so.3 (0xf6fda000)
+
+  # cd bin
+  # ls -l sh
+  lrwxrwxrwx 1 root root 4 Mar  1  2012 sh -> dash
+  # ln -sf bash sh
+  # ls -l sh
+  lrwxrwxrwx 1 root root 4 Jul  2 11:59 sh -> bash
+
+  # cat etc/apt/sources.list
+  deb http://mirrors.ustc.edu.cn/debian   wheezy main contrib non-free
+
+  # apt-get update
+  Get:1 http://mirrors.ustc.edu.cn wheezy Release.gpg [1672 B]
+  ......
+  ......
+
+  # cat etc/hostname 
+  R1D
+  # exit
+
+Now we can package the rootfs into a tar.gz file:
+
+  $ ls rootfs
+  bin  boot  dev  etc  home  lib  media  mnt  opt  proc  root  run  sbin
+  selinux  srv  sys  tmp  usr  var
+  $ sudo tar czpf debian-rootfs.tgz rootfs/
+
+scp the debian-rootfs.tgz to xiaomi router, extract it into /dev/sda4 and
+enjoy it!
+
+
+
