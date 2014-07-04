@@ -1,11 +1,11 @@
 
-        Xiaomi Router kernel
+        Xiaomi Router Core Support Package
 
 
 1. Overview
 ============
 
-Support R1D router (with 1T sata disk). Mini will be supported in the furture.
+Support Xiaomi R1D router (with 1T sata disk).
 
 The Kernel version is 2.6.36
 WLAN driver are binary object file from Broadcom located in 'drivers/net/wl'
@@ -14,7 +14,7 @@ WLAN driver are binary object file from Broadcom located in 'drivers/net/wl'
 2. Change History
 ==================
 
-  - 2014/06: First version with kernel 2.6.36, support router R1D
+  - 2014/06: First version with kernel 2.6.36, support Xiaomi router R1D
 
 
 3. Features
