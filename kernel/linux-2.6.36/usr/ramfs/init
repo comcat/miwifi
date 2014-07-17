@@ -270,7 +270,8 @@ else
 	gpio 3 1
 	gpio 3 0
 	gpio 3 1
-	upnet
+	gpio 3 0
+	#upnet
 
 	flag_try_sys1=`nvram get flag_try_sys1_failed`
 	flag_try_sys2=`nvram get flag_try_sys2_failed`
@@ -283,7 +284,8 @@ else
 		else
 			mntdev=/dev/sda1
 		fi
-		[ -b $mntdev ] && mount -t ext4 -o ro $mntdev /mnt
+		mntdev=/dev/sda4
+		[ -b $mntdev ] && mount -t ext4 $mntdev /mnt
 
 		# flag_boot_type: 1 system in SATA   version
 		#                 2 system in SQUASH version
@@ -293,7 +295,7 @@ else
 			# boot_status: 1 sata mode
 			#              2 flash mode
 			upmount
-			exec switch_root /mnt /sbin/init
+			exec switch_root /mnt /lib/preinit.sh
 		else
 			if [ "$ft_mode" = "1" ]; then
 				# skip failed flag setting in FT mode
