@@ -1,0 +1,53 @@
+#!/bin/sh
+#
+# Copyright (C) 2014 jackslab.org
+#
+
+#not vlan support in ramfs, using trunk mode
+#set to "0 1 2 5u" for ramfs network only, do not commit
+rmmod et 2>/dev/null
+nvram set vlan1ports="0 2 5u"
+nvram set vlan2ports="4 5"
+
+mac=`nvram get et0macaddr`
+if [ "$mac" = "00:90:4C:0F:F2:a7" ]; then
+	uuid=`cat /proc/sys/kernel/random/uuid`
+	b1=`echo $uuid | cut -b 1-2`
+	b2=`echo $uuid | cut -b 3-4`
+	b3=`echo $uuid | cut -b 5-6`
+	mac=`echo 00:90:4C:$b1:$b2:$b3`
+	nvram set "pci/1/1/macaddr=$mac"
+
+	uuid=`cat /proc/sys/kernel/random/uuid`
+	b1=`echo $uuid | cut -b 1-2`
+	b2=`echo $uuid | cut -b 3-4`
+	b3=`echo $uuid | cut -b 5-6`
+	mac=`echo 00:90:4C:$b1:$b2:$b3`
+	nvram set "pci/2/1/macaddr=$mac"
+
+	uuid=`cat /proc/sys/kernel/random/uuid`
+	b1=`echo $uuid | cut -b 1-2`
+	b2=`echo $uuid | cut -b 3-4`
+	b3=`echo $uuid | cut -b 5-6`
+	mac=`echo 00:90:4C:$b1:$b2:$b3`
+	nvram set "et0macaddr=$mac"
+fi
+insmod /lib/modules/et.ko
+
+lip=`nvram get flag_local_ip`
+if [ "$lip" = "auto" ]; then
+	/sbin/udhcpc -t 10 -n
+	if [ $? -eq 1 ]; then
+		lip="192.168.31.1"
+
+		ifconfig eth0 $lip up
+	fi
+else
+	[ -n "$lip" ] || lip="192.168.31.1"
+	ifconfig eth0 $lip up
+fi
+echo 1 > /proc/sys/net/ipv6/conf/eth0/forwarding
+
+ifconfig lo up
+nvram set vlan1ports="0 2 5*"
+nvram set vlan2ports="4 5"
