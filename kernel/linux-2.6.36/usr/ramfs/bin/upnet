@@ -34,7 +34,7 @@ if [ "$mac" = "00:90:4C:0F:F2:a7" ]; then
 fi
 insmod /lib/modules/et.ko
 
-lip=`nvram get flag_local_ip`
+lip=$1
 if [ "$lip" = "auto" ]; then
 	/sbin/udhcpc -t 10 -n
 	if [ $? -eq 1 ]; then
@@ -43,7 +43,7 @@ if [ "$lip" = "auto" ]; then
 		ifconfig eth0 $lip up
 	fi
 else
-	[ -n "$lip" ] || lip="192.168.31.1"
+	[ -n "$lip" ] || lip="192.168.1.1"
 	ifconfig eth0 $lip up
 fi
 echo 1 > /proc/sys/net/ipv6/conf/eth0/forwarding

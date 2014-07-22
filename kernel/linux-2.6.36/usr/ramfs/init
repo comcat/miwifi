@@ -1,5 +1,7 @@
 #!/bin/sh
-# Copyright (C) 2006-2012 OpenWrt.org
+#
+# Copyright (C) 2006-2014 OpenWrt.org
+# Copyright (C) 2014 JacksLab.org
 #
 #
 
@@ -10,44 +12,9 @@ klogger(){
 	echo "$msg" >> /dev/kmsg 2>/dev/null
 }
 
-usb_check_for_rescure(){
-	local gpiobtn
-
-	gpiobtn=`cat /proc/xiaoqiang/reset`
-	rst=`gpio $gpiobtn | awk '{print $3}'`
-	if [ "$rst" = "<0>" ]; then
-		nvram set flag_reboot_system=2
-		exec /sbin/init
-	fi
-}
-
-getmtdblockdevbyname(){
-	local name
-	name="$1"
-	test -z "$name" && return 1
-	devnum=$(cat /proc/mtd | awk "/\"$name\"/"| awk -F':' '{print $1}' | awk -F'mtd' '{print $2}')
-	test -z "$devnum" && return 1
-	if [ -e "/dev/mtdblock${devnum}" ]
-		then
-		echo "/dev/mtdblock${devnum}"
-		return 0
-	else
-		return 1
-	fi
-}
-
 reboot() {
 	nvram set flag_reboot_system=1
 	exec /sbin/init
-}
-
-updone() {
-	nvram set flag_package_update=0
-	nvram set telnet_en=1
-	nvram commit
-
-	klogger "Update successfully!!! Reboot the System..."
-	reboot
 }
 
 upnet() {
@@ -82,7 +49,7 @@ upnet() {
 	fi
 	insmod /lib/modules/et.ko
 
-	lip=`nvram get flag_local_ip`
+	lip=$1
 	if [ "$lip" = "auto" ]; then
 		/sbin/udhcpc -t 10 -n
 		if [ $? -eq 1 ]; then
@@ -91,7 +58,7 @@ upnet() {
 			ifconfig eth0 $lip up
 		fi
 	else
-		[ -n "$lip" ] || lip="192.168.31.1"
+		[ -n "$lip" ] || lip="192.168.1.1"
 		ifconfig eth0 $lip up
 	fi
 	echo 1 > /proc/sys/net/ipv6/conf/eth0/forwarding
@@ -99,56 +66,6 @@ upnet() {
 	ifconfig lo up
 	nvram set vlan1ports="0 2 5*"
 	nvram set vlan2ports="4 5"
-}
-
-uperror() {
-	klogger "SQUASHFS Filesystem Error!!!"
-	klogger "Switch to RAMFS..."
-
-	upnet
-	exec /sbin/init
-}
-
-squashfs() {
-	klogger "Switch to SQUASHFS..."
-
-#	gpio 1 1
-#	gpio 3 1
-#	gpio 2 0
-
-	# red led is error
-	#move red light to boot_check
-	#gpio 1 0
-
-#	nvram set flag_boot_type=2
-	reboot
-
-	rescuerootdev=$(getmtdblockdevbyname squashfs)
-	if [ -n "$rescuerootdev" ]
-		then
-		mount -t squashfs $rescuerootdev /mnt
-		if [ $? -ne 0 ]
-		then
-			klogger "ERROR: mount -t squashfs $rescuerootdev /mnt failed."
-		else
-			# boot_status: 1 sata mode
-			#              2 flash mode
-			echo 2 > /sys/power/boot_status
-			upmount
-			if [ -x /mnt/etc/rescueinit ]
-				then
-				klogger "switch to rescue system($rescuerootdev) by /etc/rescueinit ..."
-				exec switch_root /mnt /etc/rescueinit
-			fi
-			if [ -x /mnt/lib/preinit.sh ]
-				then
-				klogger "switch to rescue system($rescuerootdev) by /lib/preinit.sh ..."
-				exec switch_root /mnt /lib/preinit.sh
-			fi
-			umount -f $rescuerootdev
-		fi
-	fi
-	uperror
 }
 
 upmount() {
@@ -180,18 +97,12 @@ fi
 mount -t tmpfs -o "nosuid,size=20%,mode=0755" tmpfs /tmp
 
 klogger "Loading essential drivers..."
-flag_usb_rootdisk_enable="$(nvram get flag_usb_rootdisk_enable)"
 for i in `cat /lib/modules/mod.lst`;
 do
-	[ "$i" = "usb-storage.ko" -a "$flag_usb_rootdisk_enable" != 'true' ] && continue
 	if [ "$i" != "et.ko" ] ; then
-		insmod /lib/modules/$i || nvram set flag_package_update=5
+		insmod /lib/modules/$i
 	fi
 done
-
-# Check for USB rescure
-klogger "Check for USB rescure..."
-usb_check_for_rescure
 
 model=`nvram get model`
 if [ -z "$model" ]; then
@@ -203,64 +114,17 @@ if [ "$model" = "R1AC" ]; then
 	sleep 3
 fi
 
-#support tftpboot from network
-if [ "$(nvram get flag_tftp_bootup)" = 'on' -a "$(nvram get flag_tftp_booted)" = 'true' ]
-then
-	. /tftpboot.init
-	#tftpboot_mount_rootfs
-fi
-
 klogger "Press Ctrl+C to enter RAMFS..."
-rd -w 1 && nvram set flag_package_update=5
-
-if [ ! -b /dev/sda ]; then
-	klogger "Warning: No Hard Disk"
-
-	nvram set flag_no_hdd=1
-	nvram commit
-
-	squashfs
-fi
+rd -w 1 && nvram set flag_package_update=7
 
 update=`nvram get flag_package_update`
-ft_mode=`cat /sys/power/ft_mode`
-if [ -n "$update" -a "$update" != "0" ]; then
-	#
+if [ "$update" == "7" ]; then
 
-	klogger "Prepare the system to update..."
-	upnet
+	klogger "Welcome to RAMFS of Jarvis"
 
-	if [ $update = "5" ]; then
-		exec /sbin/init
-	else
-		/usr/sbin/autofd
-		if [ $? -eq 1 ]; then
-			gpio 2 1
-			gpio 3 1
-			gpio 1 0
-
-			if [ "$ft_mode" = "1" ]; then
-				exec /sbin/init
-			else
-				while true
-				do
-						/usr/sbin/update
-						retcode=$?
-
-						[ $retcode -eq 2 ] && exec /sbin/init
-						[ $retcode -eq 0 ] && updone
-				done
-			fi
-		else
-			updone
-		fi
-	fi
+	exec /sbin/init
 else
 	klogger "Bringup the system..."
-
-	#gpio 1 1
-	#gpio 2 1
-	#gpio 3 1
 	
 	# flash the blue led
 	gpio 3 1
@@ -271,19 +135,26 @@ else
 	gpio 3 0
 	gpio 3 1
 	gpio 3 0
-	#upnet
 
-	flag_try_sys1=`nvram get flag_try_sys1_failed`
-	flag_try_sys2=`nvram get flag_try_sys2_failed`
+	rootfs=`nvram get rootfs`
+	if [ "$rootfs" == "nfs" ]; then
+		upnet
+		/usr/bin/mount -onolock -t nfs 192.168.1.2:/tftpboot/rootfs /mnt
 
-	if [ "$flag_try_sys1" != "1" ] || [ "$flag_try_sys2" != "1" ]; then
-		# default: rootfs1
-		flag=`nvram get flag_boot_rootfs`
-		if [ "$flag" = "1" ]; then
-			mntdev=/dev/sda2
+		# flag_boot_type: 1 system in SATA   version
+		#                 2 system in SQUASH version
+		#                 9 system in tftp version
+		nvram set flag_boot_type=1
+		if [ -x /mnt/lib/preinit.sh ]; then
+			# boot_status: 1 sata mode
+			#              2 flash mode
+			upmount
+			exec switch_root /mnt /lib/preinit.sh
 		else
-			mntdev=/dev/sda1
+			upmount
+			exec switch_root /mnt /bin/sh
 		fi
+	else
 		mntdev=/dev/sda4
 		[ -b $mntdev ] && mount -t ext4 $mntdev /mnt
 
@@ -297,31 +168,11 @@ else
 			upmount
 			exec switch_root /mnt /lib/preinit.sh
 		else
-			if [ "$ft_mode" = "1" ]; then
-				# skip failed flag setting in FT mode
-				reboot
-			else
-				if [ "$flag" = "1" ]; then
-					nvram set flag_try_sys2_failed=1
-				else
-					nvram set flag_try_sys1_failed=1
-				fi
-				nvram set flag_ota_reboot=0
-				nvram commit
-
-				reboot
-			fi
+			upmount
+			exec switch_root /mnt /bin/sh
 		fi
+	
 	fi
 
-	# reset all failed flag in FT mode
-	if [ "$ft_mode" = "1" ]; then
-		nvram set flag_try_sys1_failed=0
-		nvram set flag_try_sys2_failed=0
-		nvram commit
-
-		reboot
-	fi
-
-	squashfs
+	reboot
 fi
