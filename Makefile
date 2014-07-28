@@ -51,6 +51,8 @@ modules_install: modules
 rootfs: modules_install
 	@echo 'Build the rootfs of Xiaomi R1D'
 	tar jxfp rootfs.tar.bz2 -C rootfs/
+	@cd rootfs && sudo tar czfp ../jarvis-rootfs.tgz *
+	@echo 'The rootfs jarvis-rootfs.tgz is generated'
 
 clean:
 	@make -C $(kerndir) ARCH=arm CROSS_COMPILE=$(cross) clean
