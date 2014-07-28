@@ -7,6 +7,13 @@ cross=../../toolchain/hndtools-arm-linux-2.6.36-uclibc-4.5.3/bin/arm-brcm-linux-
 
 STRIP=toolchain/hndtools-arm-linux-2.6.36-uclibc-4.5.3/bin/arm-brcm-linux-uclibcgnueabi-strip 
 
+NCPUS:=1
+OS:=$(shell uname -s)
+
+ifeq ($(OS),Linux)
+  NCPUS:=$(shell grep -c ^processor /proc/cpuinfo)
+endif
+
 all: vmlinuz rootfs
 	@echo '-----------------------------------------------------'
 	@echo 'Kernel image and rootfs of Xiaomi R1D is generated.'
@@ -16,13 +23,13 @@ all: vmlinuz rootfs
 
 modules:
 	@echo 'Build the kernel modules of Xiaomi R1D'
-	@make -C $(kerndir) ARCH=arm CROSS_COMPILE=$(cross) modules
+	@make -C $(kerndir) ARCH=arm CROSS_COMPILE=$(cross) modules -j$(NCPUS)
 
 vmlinuz: modules
 	@echo 'Build the kernel image of Xiaomi R1D'
 	@$(STRIP) -g $(kerndir)/drivers/net/et/et.ko -o \
 				$(kerndir)/usr/ramfs/lib/modules/et.ko
-	@make -C $(kerndir) ARCH=arm CROSS_COMPILE=$(cross) vmlinuz
+	@make -C $(kerndir) ARCH=arm CROSS_COMPILE=$(cross) vmlinuz -j$(NCPUS)
 	@cp $(kerndir)/arch/arm/boot/vmlinuz .
 
 modules_install: modules
