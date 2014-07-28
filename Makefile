@@ -21,7 +21,17 @@ all: vmlinuz rootfs
 	@echo 'The rootfs is located at rootfs/'
 	@echo '-----------------------------------------------------'
 
-modules:
+config:
+	if [ ! -f $(kerndir)/.config ]; then \
+		cp $(kerndir)/arch/arm/configs/xiaomi-r1d-with-nfs_defconfig \
+			$(kerndir)/.config; \
+	fi
+
+menuconfig: config
+	@echo 'Enter the menuconfig of the kernel of Xiaomi R1D'
+	@make -C $(kerndir) ARCH=arm CROSS_COMPILE=$(cross) menuconfig
+
+modules: config
 	@echo 'Build the kernel modules of Xiaomi R1D'
 	@make -C $(kerndir) ARCH=arm CROSS_COMPILE=$(cross) modules -j$(NCPUS)
 
@@ -43,6 +53,11 @@ rootfs: modules_install
 	tar jxfp rootfs.tar.bz2 -C rootfs/
 
 clean:
+	@make -C $(kerndir) ARCH=arm CROSS_COMPILE=$(cross) clean
+	@rm -f vmlinuz
+	@rm -rf rootfs/*
+
+distclean:
 	@make -C $(kerndir) ARCH=arm CROSS_COMPILE=$(cross) distclean
 	@rm -f vmlinuz
 	@rm -rf rootfs/*
@@ -50,8 +65,10 @@ clean:
 help:
 	@echo  'all		- Build the kernel and rootfs'
 	@echo  'clean		- Remove most generated files but keep the config'
+	@echo  'distclean	- Remove the all generated files including the config'
+	@echo  'menuconfig	- Config the kernel of Xiaomi R1D'
 	@echo  'vmlinuz		- Build the kernel of Xiaomi R1D'
 	@echo  'modules		- Build all kernel modules'
 	@echo  'rootfs		- Build the rootfs with kernel modules'
 
-.PHONY:	all clean help vmlinuz modules modules_install rootfs
+.PHONY:	all clean help vmlinuz modules modules_install rootfs menuconfig config
