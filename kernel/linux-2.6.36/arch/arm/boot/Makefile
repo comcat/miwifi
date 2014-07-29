@@ -36,7 +36,7 @@ $(obj)/vmlinux.bin: vmlinux FORCE
 
 $(obj)/vmlinuz: $(obj)/vmlinux.bin FORCE
 	$(call if_changed,lzmax)
-	$(Q)install -D -m 755 $(obj)/vmlinuz /tftpboot
+#	$(Q)install -D -m 755 $(obj)/vmlinuz /tftpboot
 
 ifeq ($(CONFIG_XIP_KERNEL),y)
 
