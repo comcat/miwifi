@@ -40,7 +40,7 @@ vmlinuz: modules
 	@$(STRIP) -g $(kerndir)/drivers/net/et/et.ko -o \
 				$(kerndir)/usr/ramfs/lib/modules/et.ko
 	@make -C $(kerndir) ARCH=arm CROSS_COMPILE=$(cross) vmlinuz -j$(NCPUS)
-	@ln -s $(kerndir)/arch/arm/boot/vmlinuz .
+	@ln -sf $(kerndir)/arch/arm/boot/vmlinuz .
 
 modules_install: modules
 	@rm -rf rootfs/*
