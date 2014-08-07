@@ -56,7 +56,8 @@ vmlinuz-nonfs: modules
 				$(kerndir)/usr/ramfs/lib/modules/et.ko
 	@rm -f $(kerndir)/usr/ramfs/usr/bin/busybox
 	@make -C $(kerndir) ARCH=arm CROSS_COMPILE=$(cross) vmlinuz -j$(NCPUS)
-	@ln -sf $(kerndir)/arch/arm/boot/vmlinuz .
+	@make -C tools/
+	@tools/trx -o vmlinuz.trx $(kerndir)/arch/arm/boot/vmlinuz
 
 modules_install: modules
 	@rm -rf rootfs/*
