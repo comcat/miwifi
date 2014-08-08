@@ -63,8 +63,16 @@ Will be support in the furture:
     + PWM
 
 
-4. Usage
-==========
+4. Test Instructions
+=====================
+
+We suggest you to try the kernel and rootfs through TFTP and NFS. These are not
+affect the original ROM system. 
+
+You can flush the kernel image into the flash and unpack the rootfs into the
+/dev/sda4 via following Section 5 instructions after you are sure that the
+system is OK.
+
 
 4.1 Build
 ----------
@@ -87,21 +95,6 @@ The wireless SSID is 'Jarvis' and 'Jarvis_5G' and the password is 'qwer1234'
 
 4.2 Prepare the Rootfs
 -----------------------
-
-4.2.1 SATA Rootfs
-------------------
-
-The kernel is use the /dev/sda4 as the root fs by default. So you need to scp
-the jarvis-rootfs.tgz into the router and unpack it into /dev/sda4:
-
-root@XiaoQiang:/# mount -text4 /dev/sda4 /userdisk/
-root@XiaoQiang:/# tar zxpf jarvis-rootfs.tgz -C /userdisk/
-root@Jarvis:/# nvram set rootfs=sata
-root@Jarvis:/# nvram commit
-
-Now after bootup the kernel via tftp in CFE, the kernel will mount the
-/dev/sda4 as the root fs by default.
-
 
 4.2.2 NFS Rootfs
 -----------------
@@ -140,6 +133,20 @@ $ sudo ln -sf /path/to/miwifi/rootfs /tftpboot/rootfs
 $ sudo /etc/init.d/nfs-kernel-server restart
 
 
+4.2.1 SATA Rootfs
+------------------
+
+The kernel is use the /dev/sda4 as the root fs by default. So you need to scp
+the jarvis-rootfs.tgz into the router and unpack it into /dev/sda4:
+
+root@XiaoQiang:/# mount -text4 /dev/sda4 /userdisk/
+root@XiaoQiang:/# tar zxpf jarvis-rootfs.tgz -C /userdisk/
+root@Jarvis:/# nvram set rootfs=sata
+root@Jarvis:/# nvram commit
+
+Now after bootup the kernel via tftp in CFE, the kernel will mount the
+/dev/sda4 as the root fs by default.
+
 
 4.2.2.3 Setup the nvram
 ------------------------
@@ -153,7 +160,6 @@ root@XiaoQiang:/# nvram commit
 
 Then after the kernel bootup, it will be mount the /tftpboot/rootfs as the
 root fs.
-
 
 
 4.3 Boot kernel
@@ -252,7 +258,91 @@ Starting program at 0x00008000
 ......
 
 
-5. APP build 
+5. Flush Instructions
+=======================
+
+If the kernel and rootfs are stable (via TFTP and NFS to test) you can try to
+flush the kernel into the flash and deploy the rootfs into /dev/sda4
+
+4.1 Build
+----------
+
+The following is validated in Ubuntu 12.04:
+
+  $ sudo apt-get install lzma
+  $ git clone git://github.com/comcat/miwifi.git
+  $ cd miwifi/
+  $ make nonfs
+
+The output kernel image is vmlinuz.trx less than 3MB. It can be flushed into the
+mtd1/mtd2
+
+The rootfs is jarvis-rootfs.tgz
+
+The root password is 'admin'
+
+The wireless SSID is 'Jarvis' and 'Jarvis_5G' and the password is 'qwer1234'
+
+
+4.2 Deploy kernel and rootfs
+-----------------------------
+
+Copy the kernel and rootfs into the router:
+
+  $ scp vmlinuz.trx root@192.168.31.1:/userdisk/
+  root@192.168.31.1's password:
+  vmlinuz
+ 
+  $ scp jarvis-rootfs.tgz root@192.168.31.1:/userdisk/
+  root@192.168.31.1's password:
+  jarvis-rootfs.tgz  
+
+
+login in the router via SSH, and deploy the rootfs into sda4:
+
+  root@XiaoQiang:/# mount | grep userdisk
+  /dev/sda4 on /userdisk type ext4 (rw,noatime,barrier=1,data=ordered)
+ 
+  root@XiaoQiang:/# tar zxpf /userdisk/jarvis-rootfs.tgz -C /userdisk/
+
+
+Deply the kernel into /dev/mtd2 (flash.os2 in CFE):
+
+  root@XiaoQiang:/# cat /proc/mtd
+  dev:    size   erasesize  name
+  mtd0: 00040000 00010000 "boot"
+  mtd1: 00300000 00010000 "os"
+  mtd2: 00300000 00010000 "os1"
+  mtd3: 00890000 00010000 "squashfs"
+  mtd4: 00010000 00010000 "crash"
+  mtd5: 00100000 00010000 "overlay"
+  mtd6: 00010000 00010000 "board_data"
+  mtd7: 00010000 00010000 "nvram"
+  mtd8: 00fe0000 00010000 "firmware"
+  root@XiaoQiang:/# mtd write /userdisk/vmlinuz.trx os1
+  Unlocking os1 ...
+ 
+  Writing from /userdisk/vmlinuz.trx to os1 ...     
+
+
+4.3 Setup the nvram
+--------------------
+
+The nvram variable 'flag_last_success' can affect the CFE loading kernel activity.
+
+If the flag_last_success = 0, CFE would be load the kernel from flash.os1 (mtd1)
+If the flag_last_success = 1, CFE would be load the kernel from flash.os2 (mtd2)
+
+  root@XiaoQiang:/# nvram set flag_tftp_bootup=off        # turn off the tftp
+  root@XiaoQiang:/# nvram get flag_last_success
+  0
+  root@XiaoQiang:/# nvram set flag_last_success=1         # load kernel from mtd2
+  root@XiaoQiang:/# nvram set rootfs=sata
+  root@XiaoQiang:/# nvram commit
+
+
+
+6. APP build 
 ==============
 
 Install an ARM basic debian on your x86 machine, The following is validated in
