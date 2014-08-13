@@ -1,4 +1,5 @@
 
+
         Xiaomi Router Core Support Package
 
 
@@ -93,14 +94,11 @@ The root password is 'admin'
 The wireless SSID is 'Jarvis' and 'Jarvis_5G' and the password is 'qwer1234'
 
 
-4.2 Prepare the Rootfs
------------------------
+4.2 Prepare the NFS Rootfs
+---------------------------
 
-4.2.2 NFS Rootfs
------------------
-
-4.2.2.1 Prepare the NFS Server
--------------------------------
+4.2.1 Prepare the NFS Server
+-----------------------------
 
 If you want to use the NFS as the root fs. You need to setup a NFS server
 in you PC:
@@ -125,30 +123,15 @@ Testing the nfs server:
 $ sudo mount -t nfs 192.168.31.2:/tftpboot/rootfs /mnt
 
 
-4.2.2.2 Link the Rootfs
-------------------------
+4.2.2 Link the Rootfs
+----------------------
 
 $ sudo rm -rf /tftpboot/rootfs
 $ sudo ln -sf /path/to/miwifi/rootfs /tftpboot/rootfs
 $ sudo /etc/init.d/nfs-kernel-server restart
 
 
-4.2.1 SATA Rootfs
-------------------
-
-The kernel is use the /dev/sda4 as the root fs by default. So you need to scp
-the jarvis-rootfs.tgz into the router and unpack it into /dev/sda4:
-
-root@XiaoQiang:/# mount -text4 /dev/sda4 /userdisk/
-root@XiaoQiang:/# tar zxpf jarvis-rootfs.tgz -C /userdisk/
-root@Jarvis:/# nvram set rootfs=sata
-root@Jarvis:/# nvram commit
-
-Now after bootup the kernel via tftp in CFE, the kernel will mount the
-/dev/sda4 as the root fs by default.
-
-
-4.2.2.3 Setup the nvram
+4.2.3 Setup the nvram
 ------------------------
 
 Set the nvram varible 'rootfs' to 'nfs', then the kernel would be mount the 
@@ -264,7 +247,7 @@ Starting program at 0x00008000
 If the kernel and rootfs are stable (via TFTP and NFS to test) you can try to
 flush the kernel into the flash and deploy the rootfs into /dev/sda4
 
-4.1 Build
+5.1 Build
 ----------
 
 The following is validated in Ubuntu 12.04:
@@ -284,7 +267,7 @@ The root password is 'admin'
 The wireless SSID is 'Jarvis' and 'Jarvis_5G' and the password is 'qwer1234'
 
 
-4.2 Deploy kernel and rootfs
+5.2 Deploy kernel and rootfs
 -----------------------------
 
 Copy the kernel and rootfs into the router:
@@ -325,7 +308,7 @@ Deply the kernel into /dev/mtd2 (flash.os2 in CFE):
   Writing from /userdisk/vmlinuz.trx to os1 ...     
 
 
-4.3 Setup the nvram
+5.3 Setup the nvram
 --------------------
 
 The nvram variable 'flag_last_success' can affect the CFE loading kernel activity.
@@ -395,5 +378,3 @@ Now you can install the essential development packages:
 
 Now you can use gcc with -static to build a 'hello world' app and then
 run the app in the router.
-
-
