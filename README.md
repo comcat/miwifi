@@ -77,7 +77,7 @@ jarvis-rootfs.tgz 为 rootfs 包。用户 'root' 的默认密码为 'admin'，Wi
 部署内核和文件系统
 ---
 
-1. 安装配置 tftp 服务器 
+x. 安装配置 tftp 服务器 
 
     $ sudo apt-get install tftpd tftp
     $ cat /etc/xinetd.d/tftp
@@ -112,7 +112,7 @@ jarvis-rootfs.tgz 为 rootfs 包。用户 'root' 的默认密码为 'admin'，Wi
     > get vmlinuz           # 获取tftp server 上的根目录下的 vmlinuz 文件
 
 
-2. 安装配置 nfs 服务器
+x. 安装配置 nfs 服务器
 
     $ sudo apt-get install nfs-kernel-server
      
