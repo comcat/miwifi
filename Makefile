@@ -14,6 +14,8 @@ ifeq ($(OS),Linux)
   NCPUS:=$(shell grep -c ^processor /proc/cpuinfo)
 endif
 
+export LD_LIBRARY_PATH=$(shell pwd)/toolchain/hndtools-arm-linux-2.6.36-uclibc-4.5.3/lib/
+
 all: vmlinuz rootfs
 	@echo '-----------------------------------------------------'
 	@echo ' Kernel image and rootfs of Xiaomi R1D is generated.'
