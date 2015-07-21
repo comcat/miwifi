@@ -3,9 +3,9 @@
 #
 
 kerndir=kernel/linux-2.6.36
-cross=../../toolchain/hndtools-arm-linux-2.6.36-uclibc-4.5.3/bin/arm-brcm-linux-uclibcgnueabi-
+cross=../../toolchain/toolchain-arm_cortex-a9+vfpv3_gcc-4.8-linaro_uClibc-0.9.33.2_eabi/bin/arm-openwrt-linux-uclibcgnueabi-
 
-STRIP=toolchain/hndtools-arm-linux-2.6.36-uclibc-4.5.3/bin/arm-brcm-linux-uclibcgnueabi-strip 
+STRIP=toolchain/toolchain-arm_cortex-a9+vfpv3_gcc-4.8-linaro_uClibc-0.9.33.2_eabi/bin/arm-openwrt-linux-uclibcgnueabi-strip 
 
 NCPUS:=1
 OS:=$(shell uname -s)
@@ -14,7 +14,8 @@ ifeq ($(OS),Linux)
   NCPUS:=$(shell grep -c ^processor /proc/cpuinfo)
 endif
 
-export LD_LIBRARY_PATH=$(shell pwd)/toolchain/hndtools-arm-linux-2.6.36-uclibc-4.5.3/lib/
+export LD_LIBRARY_PATH=$(shell pwd)/toolchain/toolchain-arm_cortex-a9+vfpv3_gcc-4.8-linaro_uClibc-0.9.33.2_eabi/lib/
+export STAGING_DIR=$(shell pwd)/staging_dir/
 
 all: vmlinuz rootfs
 	@echo '-----------------------------------------------------'

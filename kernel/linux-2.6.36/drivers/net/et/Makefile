@@ -17,7 +17,7 @@
 #
 # $Id: Makefile,v 1.5 2010-12-07 04:47:36 $
 #
-EXTRA_CFLAGS	+= -DDMA -Werror -Idrivers/net/et/
+EXTRA_CFLAGS	+= -DDMA -Idrivers/net/et/
 
 obj-$(CONFIG_ET) := et.o
 
