@@ -54,6 +54,15 @@ BCM4709 带的以太网，其 Linux 驱动是有源码的，位于：
 ---
 
     $ sudo apt-get install lzma
+
+确保 lzma 的版本是：
+
+    $ lzma --version
+    LZMA command line tool 9.22
+    LZMA SDK 9.22
+
+貌似新系统里的 lzma 被 xz-utils 替代，造成内核编译后的 vmlinuz 的头缺少解压后的长度信息，进而在 CFE 里解压失败
+
     $ git clone git://github.com/comcat/miwifi.git
     $ cd miwifi/
     $ make

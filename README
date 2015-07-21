@@ -93,6 +93,13 @@ system is OK.
 The following is validated in Ubuntu 12.04:
 
   $ sudo apt-get install lzma
+
+Please make sure the version of lzma is:
+
+  $ lzma --version
+  LZMA command line tool 9.22
+  LZMA SDK 9.22
+
   $ git clone git://github.com/comcat/miwifi.git
   $ cd miwifi/
   $ make
